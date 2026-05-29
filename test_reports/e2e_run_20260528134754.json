@@ -1,0 +1,153 @@
+{
+  "runId": "20260528134754",
+  "baseUrl": "http://localhost:8080",
+  "parentEmail": "codex_parent_20260528134754@example.com",
+  "childEmail": "codex_child_20260528134754@example.com",
+  "startedAt": "2026-05-28T13:47:54",
+  "steps": [
+    {
+      "name": "precheck_commission_candidates",
+      "status": "PASS",
+      "candidates": 0
+    },
+    {
+      "name": "admin_login",
+      "status": "PASS",
+      "admin": "admin"
+    },
+    {
+      "name": "signup_parent",
+      "status": "PASS",
+      "userId": 70,
+      "inviteCode": "67964890"
+    },
+    {
+      "name": "signup_child_team_bound",
+      "status": "PASS",
+      "childUserId": 71,
+      "before": {
+        "totalTeamCount": 0,
+        "directTeamCount": 0,
+        "level2TeamCount": 0,
+        "afterLevel2TeamCount": 0
+      },
+      "after": {
+        "totalTeamCount": 1,
+        "directTeamCount": 1,
+        "level2TeamCount": 0,
+        "afterLevel2TeamCount": 0
+      }
+    },
+    {
+      "name": "catalog_estimate",
+      "status": "PASS",
+      "product": "RTX 2080 Ti x2 / 22 GB",
+      "aiModel": "Qwen3-235B-A22B",
+      "cycle": "7天",
+      "expectedTotalProfit": 26.5356
+    },
+    {
+      "name": "recharge_idempotent_approved",
+      "status": "PASS",
+      "rechargeNo": "RC202605281347559C78DC74",
+      "wallet": {
+        "currency": "USDT",
+        "availableBalance": 15000.0,
+        "frozenBalance": 0.0,
+        "totalRecharge": 15000.0,
+        "totalWithdraw": 0.0,
+        "totalProfit": 0.0,
+        "totalCommission": 0.0
+      }
+    },
+    {
+      "name": "withdraw_approved_paid",
+      "status": "PASS",
+      "withdrawNo": "WD2026052813475672CF2009",
+      "addressId": 30
+    },
+    {
+      "name": "rental_pay_deploy_running",
+      "status": "PASS",
+      "orderNo": "RO20260528134756B9C0797B",
+      "orderAmount": 729.0,
+      "deployNo": "AD20260528134757679E8C31",
+      "apiStage": "RUNNING",
+      "snapshotCount": 1
+    },
+    {
+      "name": "early_settlement_profit_token",
+      "status": "PASS",
+      "settlementNo": "ST20260528134757ECA54720",
+      "profitRecordTotal": 2,
+      "tokenWallet": {
+        "assetCode": "TOKEN",
+        "availableBalance": 296977,
+        "totalEarned": 296977,
+        "totalConsumed": 0
+      },
+      "finalOrderStatus": "EARLY_CLOSED"
+    },
+    {
+      "name": "commission_generated",
+      "status": "PASS",
+      "scheduler": {
+        "taskName": "commission_generate",
+        "totalCount": 2,
+        "successCount": 2,
+        "failCount": 0,
+        "status": "SUCCESS",
+        "errorMessage": null
+      },
+      "commissionRecordTotal": 2,
+      "commissionSummary": {
+        "totalCommission": 1.1935755,
+        "todayCommission": 1.1935755,
+        "yesterdayCommission": 0.0,
+        "currentMonthCommission": 1.1935755,
+        "level1Commission": 1.1935755,
+        "level2Commission": 0.0
+      }
+    },
+    {
+      "name": "app_visible_lists",
+      "status": "PASS",
+      "checks": {
+        "walletTx": 9,
+        "tokenTx": 2,
+        "rechargeOrders": 1,
+        "withdrawOrders": 1,
+        "rentalOrders": 1,
+        "settlementOrders": 1
+      }
+    },
+    {
+      "name": "cleanup_temp_data",
+      "status": "PASS",
+      "userIds": [
+        70,
+        71
+      ],
+      "remainingUsersByEmail": 0,
+      "remainingRentalOrdersByOrderNo": 0
+    }
+  ],
+  "artifacts": {
+    "parentUserId": 70,
+    "childUserId": 71,
+    "orderNo": "RO20260528134756B9C0797B",
+    "rechargeNo": "RC202605281347559C78DC74",
+    "withdrawNo": "WD2026052813475672CF2009",
+    "settlementNo": "ST20260528134757ECA54720"
+  },
+  "cleanup": {
+    "userIds": [
+      70,
+      71
+    ],
+    "remainingUsersByEmail": 0,
+    "remainingRentalOrdersByOrderNo": 0
+  },
+  "status": "PASS",
+  "finishedAt": "2026-05-28T13:47:59"
+}

@@ -1,0 +1,113 @@
+{
+  "runId": "20260529032806",
+  "startedAt": "2026-05-29T03:28:06",
+  "baseUrl": "http://localhost:8080",
+  "parentEmail": "p0_parent_20260529032806@example.com",
+  "childEmail": "p0_child_20260529032806@example.com",
+  "created": {
+    "parentUserId": 72,
+    "inviteCode": "95355682",
+    "childUserId": 73
+  },
+  "steps": [
+    {
+      "name": "preflight db baselines",
+      "at": "2026-05-29T03:28:06"
+    },
+    {
+      "name": "admin login",
+      "at": "2026-05-29T03:28:07"
+    },
+    {
+      "name": "create parent/child signup codes",
+      "at": "2026-05-29T03:28:07"
+    },
+    {
+      "name": "signup parent",
+      "at": "2026-05-29T03:28:07"
+    },
+    {
+      "name": "signup child with invite code",
+      "at": "2026-05-29T03:28:07"
+    },
+    {
+      "name": "load catalog, channel, estimate",
+      "at": "2026-05-29T03:28:08"
+    }
+  ],
+  "checks": [
+    {
+      "name": "commission candidate baseline is clean",
+      "ok": true,
+      "at": "2026-05-29T03:28:07",
+      "detail": {
+        "count": 0
+      }
+    },
+    {
+      "name": "admin token received",
+      "ok": true,
+      "at": "2026-05-29T03:28:07",
+      "detail": {
+        "keys": [
+          "adminAccessToken",
+          "admin"
+        ]
+      }
+    },
+    {
+      "name": "parent signup and invite code",
+      "ok": true,
+      "at": "2026-05-29T03:28:07",
+      "detail": {
+        "parentUserId": 72,
+        "inviteCode": "95355682"
+      }
+    },
+    {
+      "name": "child signup",
+      "ok": true,
+      "at": "2026-05-29T03:28:08",
+      "detail": {
+        "childUserId": 73
+      }
+    },
+    {
+      "name": "invite relation visible in parent team summary",
+      "ok": true,
+      "at": "2026-05-29T03:28:08",
+      "detail": {
+        "totalTeamCount": 1,
+        "directTeamCount": 1,
+        "level2TeamCount": 0,
+        "afterLevel2TeamCount": 0
+      }
+    }
+  ],
+  "cleanup": {
+    "startedAt": "2026-05-29T03:28:08",
+    "remaining": {
+      "app_user": 0,
+      "user_wallet": 0,
+      "user_token_wallet": 0,
+      "recharge_order": 0,
+      "withdraw_order": 0,
+      "rental_order": 0,
+      "rental_profit_record": 0,
+      "commission_record": 0,
+      "admin_todo_notice": 0,
+      "email_verify_code": 0
+    },
+    "ok": true,
+    "finishedAt": "2026-05-29T03:28:09"
+  },
+  "errors": [
+    {
+      "phase": "run",
+      "error": "HTTP 401 GET /api/recharge/channels: {\"code\":20012,\"message\":\"请先登录\",\"data\":null,\"timestamp\":\"2026-05-29T03:28:08.4250672\"}",
+      "trace": "Traceback (most recent call last):\n  File \"<stdin>\", line 116, in api\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 215, in urlopen\n    return opener.open(url, data, timeout)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 521, in open\n    response = meth(req, response)\n               ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 630, in http_response\n    response = self.parent.error(\n               ^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 559, in error\n    return self._call_chain(*args)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 492, in _call_chain\n    result = func(*args)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 639, in http_error_default\n    raise HTTPError(req.full_url, code, msg, hdrs, fp)\nurllib.error.HTTPError: HTTP Error 401: \n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 294, in <module>\n  File \"<stdin>\", line 120, in api\nRuntimeError: HTTP 401 GET /api/recharge/channels: {\"code\":20012,\"message\":\"请先登录\",\"data\":null,\"timestamp\":\"2026-05-29T03:28:08.4250672\"}\n"
+    }
+  ],
+  "status": "failed",
+  "finishedAt": "2026-05-29T03:28:09"
+}

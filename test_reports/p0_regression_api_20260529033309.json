@@ -1,0 +1,530 @@
+{
+  "runId": "20260529033309",
+  "startedAt": "2026-05-29T03:33:09",
+  "baseUrl": "http://localhost:8080",
+  "parentEmail": "p0_parent_20260529033309@example.com",
+  "childEmail": "p0_child_20260529033309@example.com",
+  "created": {
+    "parentUserId": 76,
+    "childUserId": 77,
+    "inviteCode": "79329467",
+    "selection": {
+      "productId": 124,
+      "productName": "Tesla T4 / 16 GB",
+      "rentPrice": "1469.0",
+      "aiModelId": 1,
+      "aiModelName": "GPT-5.4",
+      "cycleRuleId": 1,
+      "cycleDays": 7,
+      "channelId": 15
+    },
+    "rechargeNo": "RC2026052903331023ACE443",
+    "withdrawNo": "WD202605290333116D33ACD7",
+    "rentalOrderNo": "RO202605290333112ADB8D56",
+    "settlementNo": "ST202605290333119EFB65ED"
+  },
+  "steps": [
+    {
+      "name": "preflight db baselines",
+      "at": "2026-05-29T03:33:09"
+    },
+    {
+      "name": "admin login",
+      "at": "2026-05-29T03:33:09"
+    },
+    {
+      "name": "signup parent/child users",
+      "at": "2026-05-29T03:33:09"
+    },
+    {
+      "name": "load catalog, channel, estimate",
+      "at": "2026-05-29T03:33:10"
+    },
+    {
+      "name": "create and approve recharge",
+      "at": "2026-05-29T03:33:10"
+    },
+    {
+      "name": "create withdraw address/order and admin paid",
+      "at": "2026-05-29T03:33:11"
+    },
+    {
+      "name": "create rental order, pay machine fee, pay deploy fee",
+      "at": "2026-05-29T03:33:11"
+    },
+    {
+      "name": "backdate temp order run segment for profit generation",
+      "at": "2026-05-29T03:33:11"
+    },
+    {
+      "name": "early settle rental order and verify profit/token wallet",
+      "at": "2026-05-29T03:33:11"
+    },
+    {
+      "name": "run commission generation scheduler for temp profit records",
+      "at": "2026-05-29T03:33:11"
+    },
+    {
+      "name": "verify list endpoints for p0 closure",
+      "at": "2026-05-29T03:33:12"
+    }
+  ],
+  "checks": [
+    {
+      "name": "commission candidate baseline is clean",
+      "ok": true,
+      "at": "2026-05-29T03:33:09",
+      "detail": {
+        "count": 0
+      }
+    },
+    {
+      "name": "admin token received",
+      "ok": true,
+      "at": "2026-05-29T03:33:09",
+      "detail": {
+        "keys": [
+          "adminAccessToken",
+          "admin"
+        ]
+      }
+    },
+    {
+      "name": "invite relation visible in parent team summary",
+      "ok": true,
+      "at": "2026-05-29T03:33:10",
+      "detail": {
+        "totalTeamCount": 1,
+        "directTeamCount": 1,
+        "level2TeamCount": 0,
+        "afterLevel2TeamCount": 0
+      }
+    },
+    {
+      "name": "catalog prerequisites available",
+      "ok": true,
+      "at": "2026-05-29T03:33:10",
+      "detail": {
+        "productCount": 100,
+        "modelCount": 25,
+        "cycleCount": 6,
+        "channelCount": 7
+      }
+    },
+    {
+      "name": "rental estimate returns positive amount/profit",
+      "ok": true,
+      "at": "2026-05-29T03:33:10",
+      "detail": {
+        "productId": 124,
+        "productName": "Tesla T4 / 16 GB",
+        "aiModelId": 1,
+        "aiModelName": "GPT-5.4",
+        "cycleRuleId": 1,
+        "cycleName": "7天",
+        "cycleDays": 7,
+        "rentPrice": 1469.0,
+        "yieldRate": 0.0055,
+        "deployTechFee": 14.69,
+        "deployFeeRate": 0.01,
+        "tokenOutputPerDay": 403200,
+        "tokenUnitPrice": 6.25e-06,
+        "yieldMultiplier": 1.0,
+        "expectedDailyProfit": 8.0795,
+        "expectedTotalProfit": 56.5565,
+        "locale": "zh-CN",
+        "requestedLocale": "zh-CN",
+        "localeFallback": false
+      }
+    },
+    {
+      "name": "recharge idempotency",
+      "ok": true,
+      "at": "2026-05-29T03:33:10",
+      "detail": {
+        "rechargeNo": "RC2026052903331023ACE443"
+      }
+    },
+    {
+      "name": "recharge approved and credited",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "approved": {
+          "rechargeNo": "RC2026052903331023ACE443",
+          "userName": "P0Child033309",
+          "email": "p0_child_20260529033309@example.com",
+          "channelId": 15,
+          "currency": "USDT",
+          "channelName": "System Test USDT",
+          "network": "TRC20",
+          "displayUrl": "https://example.invalid/pay/20260524T19265",
+          "channelQrCodeUrl": null,
+          "accountNo": "T20260524T19265",
+          "applyAmount": 10000000.0,
+          "actualAmount": 10000000.0,
+          "externalTxNo": "P0TX20260529033309",
+          "paymentProofUrl": "https://example.com/p0-proof/20260529033309.png",
+          "userRemark": "P0 regression 20260529033309",
+          "status": "APPROVED",
+          "reviewedBy": 1,
+          "reviewedByName": "admin",
+          "reviewedAt": "2026-05-29T03:33:11",
+          "reviewRemark": "P0 approve 20260529033309",
+          "creditedAt": "2026-05-29T03:33:11",
+          "walletTxNo": "WT202605290333118B50FF6C11",
+          "createdAt": "2026-05-29T03:33:11"
+        },
+        "wallet": {
+          "currency": "USDT",
+          "availableBalance": 10000000.0,
+          "frozenBalance": 0.0,
+          "totalRecharge": 10000000.0,
+          "totalWithdraw": 0.0,
+          "totalProfit": 0.0,
+          "totalCommission": 0.0
+        }
+      }
+    },
+    {
+      "name": "withdraw created and frozen",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "withdrawNo": "WD202605290333116D33ACD7",
+        "userName": "P0Child033309",
+        "email": "p0_child_20260529033309@example.com",
+        "currency": "USDT",
+        "withdrawMethod": "USDT",
+        "network": "TRC20",
+        "accountName": "P0 Regression",
+        "accountNo": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
+        "applyAmount": 123.45,
+        "feeAmount": 0.0,
+        "actualAmount": 123.45,
+        "status": "PENDING_REVIEW",
+        "freezeTxNo": "WT2026052903331132ECF61D35",
+        "unfreezeTxNo": null,
+        "paidTxNo": null,
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "reviewRemark": null,
+        "paidAt": null,
+        "payProofNo": null,
+        "createdAt": "2026-05-29T03:33:11"
+      }
+    },
+    {
+      "name": "withdraw approved and paid",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "withdrawNo": "WD202605290333116D33ACD7",
+        "userName": "P0Child033309",
+        "email": "p0_child_20260529033309@example.com",
+        "currency": "USDT",
+        "withdrawMethod": "USDT",
+        "network": "TRC20",
+        "accountName": "P0 Regression",
+        "accountNo": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
+        "applyAmount": 123.45,
+        "feeAmount": 0.0,
+        "actualAmount": 123.45,
+        "status": "PAID",
+        "freezeTxNo": "WT2026052903331132ECF61D35",
+        "unfreezeTxNo": null,
+        "paidTxNo": "WT2026052903331155E964CB76",
+        "reviewedBy": 1,
+        "reviewedAt": "2026-05-29T03:33:11",
+        "reviewRemark": "P0 approve 20260529033309",
+        "paidAt": "2026-05-29T03:33:11",
+        "payProofNo": "P0PAY20260529033309",
+        "createdAt": "2026-05-29T03:33:11"
+      }
+    },
+    {
+      "name": "rental order idempotency",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "orderNo": "RO202605290333112ADB8D56"
+      }
+    },
+    {
+      "name": "machine fee paid and credential generated",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "orderNo": "RO202605290333112ADB8D56",
+        "userName": "P0Child033309",
+        "productId": 124,
+        "aiModelId": 1,
+        "cycleRuleId": 1,
+        "productCodeSnapshot": "P_FOSHAN_117_BEDA118EFA",
+        "productNameSnapshot": "Tesla T4 / 16 GB",
+        "machineCodeSnapshot": "beda118efa",
+        "machineAliasSnapshot": "117机",
+        "regionNameSnapshot": "佛山区",
+        "gpuModelSnapshot": "Tesla T4",
+        "gpuMemorySnapshotGb": 16,
+        "gpuPowerTopsSnapshot": 130.0,
+        "gpuRentPriceSnapshot": 1469.0,
+        "productYieldRateSnapshot": 0.0055,
+        "tokenOutputPerMinuteSnapshot": 280,
+        "tokenOutputPerDaySnapshot": 403200,
+        "aiModelNameSnapshot": "GPT-5.4",
+        "aiVendorNameSnapshot": "OpenAI",
+        "monthlyTokenConsumptionSnapshot": 18.0,
+        "tokenUnitPriceSnapshot": 6.25e-06,
+        "deployFeeSnapshot": 14.69,
+        "deployFeeRateSnapshot": 0.01,
+        "cycleDaysSnapshot": 7,
+        "yieldMultiplierSnapshot": 1.0,
+        "earlyPenaltyRateSnapshot": 0.01,
+        "currency": "USDT",
+        "orderAmount": 1469.0,
+        "paidAmount": 1469.0,
+        "expectedDailyProfit": 8.0795,
+        "expectedTotalProfit": 56.5565,
+        "orderStatus": "PENDING_ACTIVATION",
+        "profitStatus": "NOT_STARTED",
+        "settlementStatus": "UNSETTLED",
+        "machinePayTxNo": "WT202605290333114A3C23EB87",
+        "paidAt": "2026-05-29T03:33:11",
+        "apiGeneratedAt": "2026-05-29T03:33:11",
+        "deployFeePaidAt": null,
+        "activatedAt": null,
+        "autoPauseAt": null,
+        "pausedAt": null,
+        "startedAt": null,
+        "profitStartAt": null,
+        "profitEndAt": null,
+        "expiredAt": null,
+        "canceledAt": null,
+        "finishedAt": null,
+        "createdAt": "2026-05-29T03:33:11",
+        "apiCredential": {
+          "credentialNo": "AC20260529033311F567FEA3",
+          "apiName": "GPT-5.4 API",
+          "apiBaseUrl": "https://api.webcal.invalid/v1",
+          "tokenMasked": "sk-****8745fe",
+          "modelNameSnapshot": "GPT-5.4",
+          "deployFeeSnapshot": 14.69,
+          "deployFeeRateSnapshot": 0.01,
+          "tokenStatus": "GENERATED",
+          "generatedAt": "2026-05-29T03:33:11",
+          "activationPaidAt": null,
+          "activatedAt": null,
+          "autoPauseAt": null,
+          "pausedAt": null,
+          "startedAt": null,
+          "expiredAt": null
+        }
+      }
+    },
+    {
+      "name": "deploy fee paid and order running",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "deploy": {
+          "deployNo": "AD202605290333113D4B1E10",
+          "userName": "P0Child033309",
+          "orderNo": "RO202605290333112ADB8D56",
+          "credentialNo": "AC20260529033311F567FEA3",
+          "modelNameSnapshot": "GPT-5.4",
+          "deployFeeAmount": 14.69,
+          "status": "PAID",
+          "walletTxNo": "WT202605290333119F96AEB7C3",
+          "paidAt": "2026-05-29T03:33:11",
+          "createdAt": "2026-05-29T03:33:11"
+        },
+        "detailStatus": "RUNNING"
+      }
+    },
+    {
+      "name": "api management shows running API",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "records": [
+          {
+            "orderNo": "RO202605290333112ADB8D56",
+            "orderStatus": "RUNNING",
+            "credentialNo": "AC20260529033311F567FEA3",
+            "tokenStatus": "ACTIVE",
+            "modelNameSnapshot": "GPT-5.4",
+            "deployFeeSnapshot": 14.69,
+            "deployFeeRateSnapshot": 0.01,
+            "apiName": "GPT-5.4 API",
+            "apiBaseUrl": "https://api.webcal.invalid/v1",
+            "tokenMasked": "sk-****8745fe",
+            "deployOrderStatus": "PAID",
+            "paidAt": "2026-05-29T03:33:11",
+            "apiStage": "RUNNING",
+            "profitStartAt": "2026-05-29T03:33:11",
+            "profitEndAt": "2026-06-05T03:33:11",
+            "autoPauseAt": "2026-05-30T03:33:11",
+            "nextStopAt": "2026-05-30T03:33:11",
+            "nextStopReason": "AUTO_PAUSE",
+            "pausedAt": null,
+            "startedAt": "2026-05-29T03:33:11",
+            "expiredAt": null,
+            "finishedAt": null,
+            "settlementStatus": "UNSETTLED",
+            "profitStatus": "RUNNING",
+            "cycleDaysSnapshot": 7
+          }
+        ],
+        "total": 1,
+        "pageNo": 1,
+        "pageSize": 10
+      }
+    },
+    {
+      "name": "today estimate readable while order running",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "estimatedProfit": 1.19509271,
+        "calculatedAt": "2026-05-29T03:33:11.6716644",
+        "orderCount": 1,
+        "currency": "USDT"
+      }
+    },
+    {
+      "name": "early settlement closed order",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "settlement": {
+          "settlementNo": "ST202605290333119EFB65ED",
+          "orderNo": "RO202605290333112ADB8D56",
+          "settlementType": "EARLY_TERMINATE",
+          "currency": "USDT",
+          "principalAmount": 1469.0,
+          "profitAmount": 8.07388924,
+          "penaltyAmount": 14.69,
+          "actualSettleAmount": 1454.31,
+          "status": "SETTLED",
+          "reviewedBy": null,
+          "reviewedAt": null,
+          "settledAt": "2026-05-29T03:33:12",
+          "walletTxNo": "WT202605290333112A34420DFD",
+          "remark": null,
+          "createdAt": "2026-05-29T03:33:12"
+        },
+        "orderStatus": "EARLY_CLOSED"
+      }
+    },
+    {
+      "name": "profit and token settlement visible",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "profitSummary": {
+          "totalProfit": 8.07388924,
+          "todayProfit": 1.19509271,
+          "yesterdayProfit": 6.87879653,
+          "currentMonthProfit": 8.07388924,
+          "settledProfitCount": 2
+        },
+        "tokenWallet": {
+          "assetCode": "TOKEN",
+          "availableBalance": 402920,
+          "totalEarned": 402920,
+          "totalConsumed": 0
+        },
+        "profitRecordTotal": 2
+      }
+    },
+    {
+      "name": "commission candidates are only temp records",
+      "ok": true,
+      "at": "2026-05-29T03:33:11",
+      "detail": {
+        "total": 2,
+        "temp": 2
+      }
+    },
+    {
+      "name": "commission scheduler succeeded",
+      "ok": true,
+      "at": "2026-05-29T03:33:12",
+      "detail": {
+        "taskName": "commission_generate",
+        "totalCount": 2,
+        "successCount": 2,
+        "failCount": 0,
+        "status": "SUCCESS",
+        "errorMessage": null
+      }
+    },
+    {
+      "name": "parent commission visible and wallet credited",
+      "ok": true,
+      "at": "2026-05-29T03:33:12",
+      "detail": {
+        "commissionSummary": {
+          "totalCommission": 1.61477785,
+          "todayCommission": 1.61477785,
+          "yesterdayCommission": 0.0,
+          "currentMonthCommission": 1.61477785,
+          "level1Commission": 1.61477785,
+          "level2Commission": 0.0
+        },
+        "recordsTotal": 2,
+        "parentWallet": {
+          "currency": "USDT",
+          "availableBalance": 1.61477785,
+          "frozenBalance": 0.0,
+          "totalRecharge": 0.0,
+          "totalWithdraw": 0.0,
+          "totalProfit": 0.0,
+          "totalCommission": 1.61477785
+        }
+      }
+    },
+    {
+      "name": "user-side order/recharge/withdraw/settlement/team lists include temp data",
+      "ok": true,
+      "at": "2026-05-29T03:33:12",
+      "detail": {
+        "childWallet": {
+          "currency": "USDT",
+          "availableBalance": 9999855.24388924,
+          "frozenBalance": 0.0,
+          "totalRecharge": 10000000.0,
+          "totalWithdraw": 123.45,
+          "totalProfit": 8.07388924,
+          "totalCommission": 0.0
+        },
+        "orderTotal": 1,
+        "rechargeTotal": 1,
+        "withdrawTotal": 1,
+        "settlementTotal": 1,
+        "teamTotal": 1
+      }
+    }
+  ],
+  "cleanup": {
+    "startedAt": "2026-05-29T03:33:12",
+    "remaining": {
+      "app_user": 0,
+      "user_wallet": 0,
+      "user_token_wallet": 0,
+      "recharge_order": 0,
+      "withdraw_order": 0,
+      "rental_order": 0,
+      "rental_profit_record": 0,
+      "commission_record": 0,
+      "admin_todo_notice": 0,
+      "email_verify_code": 0
+    },
+    "ok": true,
+    "finishedAt": "2026-05-29T03:33:13"
+  },
+  "errors": [],
+  "status": "passed",
+  "finishedAt": "2026-05-29T03:33:13"
+}
