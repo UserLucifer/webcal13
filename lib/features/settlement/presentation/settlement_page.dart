@@ -225,7 +225,7 @@ class _SettlementRecordCard extends StatelessWidget {
     return WebCalCard(
       onTap: item.settlementNo == null
           ? null
-          : () => context.go('/settlements/${item.settlementNo}'),
+          : () => context.push('/settlements/${item.settlementNo}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

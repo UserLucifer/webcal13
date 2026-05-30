@@ -15,6 +15,8 @@ import '../../../shared/widgets/screen_scaffold.dart';
 import '../../../shared/widgets/webcal_card.dart';
 import '../data/wallet_repository.dart';
 
+enum _WalletAssetTab { funds, token }
+
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
@@ -36,6 +38,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   String? _loadMoreUsdtError;
   String? _loadMoreTokenError;
   bool _balancesVisible = true;
+  _WalletAssetTab _activeTab = _WalletAssetTab.funds;
 
   void _clearUsdtPaging() {
     _usdtPagingVersion += 1;
@@ -56,14 +59,16 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   void _refresh() {
-    setState(() {
-      _clearUsdtPaging();
-      _clearTokenPaging();
-    });
-    ref.invalidate(walletProvider);
-    ref.invalidate(tokenWalletProvider);
-    ref.invalidate(walletTransactionsProvider);
-    ref.invalidate(tokenWalletTransactionsProvider);
+    switch (_activeTab) {
+      case _WalletAssetTab.funds:
+        setState(_clearUsdtPaging);
+        ref.invalidate(walletProvider);
+        ref.invalidate(walletTransactionsProvider);
+      case _WalletAssetTab.token:
+        setState(_clearTokenPaging);
+        ref.invalidate(tokenWalletProvider);
+        ref.invalidate(tokenWalletTransactionsProvider);
+    }
   }
 
   void _refreshUsdtTransactions() {
@@ -150,12 +155,17 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     }
   }
 
+  void _changeTab(_WalletAssetTab tab) {
+    if (_activeTab == tab) {
+      return;
+    }
+    setState(() => _activeTab = tab);
+  }
+
   @override
   Widget build(BuildContext context) {
     final wallet = ref.watch(walletProvider);
     final token = ref.watch(tokenWalletProvider);
-    final txs = ref.watch(walletTransactionsProvider);
-    final tokenTxs = ref.watch(tokenWalletTransactionsProvider);
     final walletCurrency = wallet.valueOrNull?.currency;
     final tokenAssetCode = token.valueOrNull?.assetCode;
     final tokenFlowTitle = _unitTitle(tokenAssetCode, fallback: 'Token');
@@ -164,284 +174,325 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       title: '钱包与流水',
       onRefresh: _refresh,
       children: [
-        AsyncStateView(
-          value: wallet,
-          onRetry: () => ref.invalidate(walletProvider),
-          builder: (data) => Column(
+        _WalletAssetTabs(
+          activeTab: _activeTab,
+          fundsLabel: _unitTitle(walletCurrency, fallback: '资金'),
+          tokenLabel: tokenFlowTitle,
+          onChanged: _changeTab,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: Column(
+            key: ValueKey(_activeTab),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: switch (_activeTab) {
+              _WalletAssetTab.funds => _fundsChildren(
+                context,
+                wallet,
+                walletCurrency,
+              ),
+              _WalletAssetTab.token => _tokenChildren(
+                context,
+                token,
+                tokenAssetCode,
+                tokenFlowTitle,
+              ),
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _fundsChildren(
+    BuildContext context,
+    AsyncValue<WalletInfo> wallet,
+    String? walletCurrency,
+  ) {
+    final txs = ref.watch(walletTransactionsProvider);
+    return [
+      AsyncStateView(
+        value: wallet,
+        onRetry: () => ref.invalidate(walletProvider),
+        builder: (data) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            WebCalCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_unitTitle(data.currency, fallback: '资金')} 钱包',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(
+                          () => _balancesVisible = !_balancesVisible,
+                        ),
+                        tooltip: _balancesVisible ? '隐藏余额' : '显示余额',
+                        icon: Icon(
+                          _balancesVisible
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      MetricTile(
+                        label: '可用余额',
+                        value: _privateAmount(
+                          _money(data.availableBalance, data.currency),
+                        ),
+                        accent: true,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      MetricTile(
+                        label: '冻结余额',
+                        value: _privateAmount(
+                          _money(data.frozenBalance, data.currency),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => context.push('/recharge'),
+                          icon: const Icon(LucideIcons.plusCircle),
+                          label: const Text('充值'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/withdraw'),
+                          icon: const Icon(LucideIcons.arrowUpRight),
+                          label: const Text('提现'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _WalletTotalsCarousel(
+              items: [
+                _WalletTotalData(
+                  label: '累计充值',
+                  value: _privateAmount(
+                    _money(data.totalRecharge, data.currency),
+                  ),
+                  icon: LucideIcons.arrowDownLeft,
+                ),
+                _WalletTotalData(
+                  label: '累计提现',
+                  value: _privateAmount(
+                    _money(data.totalWithdraw, data.currency),
+                  ),
+                  icon: LucideIcons.arrowUpRight,
+                ),
+                _WalletTotalData(
+                  label: '累计收益',
+                  value: _privateAmount(
+                    _money(data.totalProfit, data.currency),
+                  ),
+                  icon: LucideIcons.trendingUp,
+                ),
+                _WalletTotalData(
+                  label: '累计佣金',
+                  value: _privateAmount(
+                    _money(data.totalCommission, data.currency),
+                  ),
+                  icon: LucideIcons.coins,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      const SectionTitle(title: '资金流水'),
+      AsyncStateView(
+        value: txs,
+        onRetry: _refreshUsdtTransactions,
+        builder: (page) {
+          final records = [...page.records, ..._moreUsdtTransactions];
+          final hasMore = !_reachedUsdtEnd && records.length < page.total;
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              WebCalCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${_unitTitle(data.currency, fallback: '资金')} 钱包',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => setState(
-                            () => _balancesVisible = !_balancesVisible,
-                          ),
-                          tooltip: _balancesVisible ? '隐藏余额' : '显示余额',
-                          icon: Icon(
-                            _balancesVisible
-                                ? LucideIcons.eye
-                                : LucideIcons.eyeOff,
-                          ),
-                        ),
-                      ],
+              if (records.isEmpty)
+                const EmptyCard(
+                  title: '暂无流水',
+                  subtitle: '充值、提现、支付和收益入账后会显示在这里。',
+                  icon: LucideIcons.receipt,
+                )
+              else ...[
+                for (final tx in records)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _TransactionListCard.usdt(
+                      tx: tx,
+                      currency: walletCurrency,
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        MetricTile(
-                          label: '可用余额',
-                          value: _privateAmount(
-                            _money(data.availableBalance, data.currency),
-                          ),
-                          accent: true,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        MetricTile(
-                          label: '冻结余额',
-                          value: _privateAmount(
-                            _money(data.frozenBalance, data.currency),
-                          ),
-                        ),
-                      ],
+                  ),
+                if (_loadMoreUsdtError != null) ...[
+                  ErrorCard(
+                    message: _loadMoreUsdtError!,
+                    onRetry: () => _loadMoreUsdt(page),
+                  ),
+                ] else if (hasMore) ...[
+                  OutlinedButton.icon(
+                    onPressed: _loadingMoreUsdt
+                        ? null
+                        : () => _loadMoreUsdt(page),
+                    icon: _loadingMoreUsdt
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.chevronsDown),
+                    label: Text(_loadingMoreUsdt ? '加载中...' : '加载更多'),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      '已显示全部流水',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => context.go('/recharge'),
-                            icon: const Icon(LucideIcons.plusCircle),
-                            label: const Text('充值'),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.go('/withdraw'),
-                            icon: const Icon(LucideIcons.arrowUpRight),
-                            label: const Text('提现'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
+              ],
+            ],
+          );
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _tokenChildren(
+    BuildContext context,
+    AsyncValue<TokenWalletInfo> token,
+    String? tokenAssetCode,
+    String tokenFlowTitle,
+  ) {
+    final tokenTxs = ref.watch(tokenWalletTransactionsProvider);
+    return [
+      AsyncStateView(
+        value: token,
+        onRetry: () => ref.invalidate(tokenWalletProvider),
+        builder: (data) => WebCalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${data.assetCode ?? 'Token'} 钱包',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: AppSpacing.md),
               _WalletTotalsCarousel(
                 items: [
                   _WalletTotalData(
-                    label: '累计充值',
-                    value: _privateAmount(
-                      _money(data.totalRecharge, data.currency),
-                    ),
-                    icon: LucideIcons.arrowDownLeft,
+                    label: '可用 TOKEN',
+                    value: _privateAmount(_assetAmount(data.availableBalance)),
+                    icon: LucideIcons.wallet,
                   ),
                   _WalletTotalData(
-                    label: '累计提现',
-                    value: _privateAmount(
-                      _money(data.totalWithdraw, data.currency),
-                    ),
-                    icon: LucideIcons.arrowUpRight,
-                  ),
-                  _WalletTotalData(
-                    label: '累计收益',
-                    value: _privateAmount(
-                      _money(data.totalProfit, data.currency),
-                    ),
+                    label: '累计产出 TOKEN',
+                    value: _privateAmount(_assetAmount(data.totalEarned)),
                     icon: LucideIcons.trendingUp,
                   ),
                   _WalletTotalData(
-                    label: '累计佣金',
-                    value: _privateAmount(
-                      _money(data.totalCommission, data.currency),
-                    ),
-                    icon: LucideIcons.coins,
+                    label: '累计消耗 TOKEN',
+                    value: _privateAmount(_assetAmount(data.totalConsumed)),
+                    icon: LucideIcons.arrowUpRight,
                   ),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        AsyncStateView(
-          value: token,
-          onRetry: () => ref.invalidate(tokenWalletProvider),
-          builder: (data) => WebCalCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${data.assetCode ?? 'Token'} 钱包',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _WalletTotalsCarousel(
-                  items: [
-                    _WalletTotalData(
-                      label: '可用 TOKEN',
-                      value: _privateAmount(
-                        _assetAmount(data.availableBalance),
-                      ),
-                      icon: LucideIcons.wallet,
+      ),
+      SectionTitle(title: '$tokenFlowTitle 流水'),
+      AsyncStateView(
+        value: tokenTxs,
+        onRetry: _refreshTokenTransactions,
+        builder: (page) {
+          final records = [...page.records, ..._moreTokenTransactions];
+          final hasMore = !_reachedTokenEnd && records.length < page.total;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (records.isEmpty)
+                const EmptyCard(
+                  title: '暂无 Token 流水',
+                  subtitle: 'Token 产出或消耗后会显示在这里。',
+                  icon: LucideIcons.receipt,
+                )
+              else ...[
+                for (final tx in records)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _TransactionListCard.token(
+                      tx: tx,
+                      assetCode: tokenAssetCode,
                     ),
-                    _WalletTotalData(
-                      label: '累计产出 TOKEN',
-                      value: _privateAmount(_assetAmount(data.totalEarned)),
-                      icon: LucideIcons.trendingUp,
+                  ),
+                if (_loadMoreTokenError != null) ...[
+                  ErrorCard(
+                    message: _loadMoreTokenError!,
+                    onRetry: () => _loadMoreToken(page),
+                  ),
+                ] else if (hasMore) ...[
+                  OutlinedButton.icon(
+                    onPressed: _loadingMoreToken
+                        ? null
+                        : () => _loadMoreToken(page),
+                    icon: _loadingMoreToken
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.chevronsDown),
+                    label: Text(_loadingMoreToken ? '加载中...' : '加载更多'),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      '已显示全部 Token 流水',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
                     ),
-                    _WalletTotalData(
-                      label: '累计消耗 TOKEN',
-                      value: _privateAmount(_assetAmount(data.totalConsumed)),
-                      icon: LucideIcons.arrowUpRight,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SectionTitle(title: '流水记录'),
-        AsyncStateView(
-          value: txs,
-          onRetry: _refreshUsdtTransactions,
-          builder: (page) {
-            final records = [...page.records, ..._moreUsdtTransactions];
-            final hasMore = !_reachedUsdtEnd && records.length < page.total;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (records.isEmpty)
-                  const EmptyCard(
-                    title: '暂无流水',
-                    subtitle: '充值、提现、支付和收益入账后会显示在这里。',
-                    icon: LucideIcons.receipt,
-                  )
-                else ...[
-                  for (final tx in records)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _TransactionListCard.usdt(
-                        tx: tx,
-                        currency: walletCurrency,
-                      ),
-                    ),
-                  if (_loadMoreUsdtError != null) ...[
-                    ErrorCard(
-                      message: _loadMoreUsdtError!,
-                      onRetry: () => _loadMoreUsdt(page),
-                    ),
-                  ] else if (hasMore) ...[
-                    OutlinedButton.icon(
-                      onPressed: _loadingMoreUsdt
-                          ? null
-                          : () => _loadMoreUsdt(page),
-                      icon: _loadingMoreUsdt
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(LucideIcons.chevronsDown),
-                      label: Text(_loadingMoreUsdt ? '加载中...' : '加载更多'),
-                    ),
-                  ] else ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: Text(
-                        '已显示全部流水',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ],
-            );
-          },
-        ),
-        SectionTitle(title: '$tokenFlowTitle 流水'),
-        AsyncStateView(
-          value: tokenTxs,
-          onRetry: _refreshTokenTransactions,
-          builder: (page) {
-            final records = [...page.records, ..._moreTokenTransactions];
-            final hasMore = !_reachedTokenEnd && records.length < page.total;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TransactionSummary(
-                  title: '$tokenFlowTitle 流水',
-                  total: page.total,
-                  visibleCount: records.length,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (records.isEmpty)
-                  const EmptyCard(
-                    title: '暂无 Token 流水',
-                    subtitle: 'Token 产出或消耗后会显示在这里。',
-                    icon: LucideIcons.receipt,
-                  )
-                else ...[
-                  for (final tx in records)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _TransactionListCard.token(
-                        tx: tx,
-                        assetCode: tokenAssetCode,
-                      ),
-                    ),
-                  if (_loadMoreTokenError != null) ...[
-                    ErrorCard(
-                      message: _loadMoreTokenError!,
-                      onRetry: () => _loadMoreToken(page),
-                    ),
-                  ] else if (hasMore) ...[
-                    OutlinedButton.icon(
-                      onPressed: _loadingMoreToken
-                          ? null
-                          : () => _loadMoreToken(page),
-                      icon: _loadingMoreToken
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(LucideIcons.chevronsDown),
-                      label: Text(_loadingMoreToken ? '加载中...' : '加载更多'),
-                    ),
-                  ] else ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: Text(
-                        '已显示全部 Token 流水',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ),
-                  ],
-                ],
-              ],
-            );
-          },
-        ),
-      ],
-    );
+            ],
+          );
+        },
+      ),
+    ];
   }
 
   String _privateAmount(String value) {
@@ -449,6 +500,100 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       return value;
     }
     return '****';
+  }
+}
+
+class _WalletAssetTabs extends StatelessWidget {
+  const _WalletAssetTabs({
+    required this.activeTab,
+    required this.fundsLabel,
+    required this.tokenLabel,
+    required this.onChanged,
+  });
+
+  final _WalletAssetTab activeTab;
+  final String fundsLabel;
+  final String tokenLabel;
+  final ValueChanged<_WalletAssetTab> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          Expanded(
+            child: _WalletAssetTabButton(
+              icon: LucideIcons.wallet,
+              label: '$fundsLabel 钱包',
+              selected: activeTab == _WalletAssetTab.funds,
+              onTap: () => onChanged(_WalletAssetTab.funds),
+            ),
+          ),
+          Expanded(
+            child: _WalletAssetTabButton(
+              icon: LucideIcons.coins,
+              label: '$tokenLabel 钱包',
+              selected: activeTab == _WalletAssetTab.token,
+              onTap: () => onChanged(_WalletAssetTab.token),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletAssetTabButton extends StatelessWidget {
+  const _WalletAssetTabButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? AppColors.electricGreen : AppColors.muted;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.lg),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 11,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.deepForest : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: foreground),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -746,68 +891,6 @@ class _TransactionHero extends StatelessWidget {
   }
 }
 
-class _TransactionSummary extends StatelessWidget {
-  const _TransactionSummary({
-    required this.title,
-    required this.total,
-    required this.visibleCount,
-  });
-
-  final String title;
-  final int total;
-  final int visibleCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return WebCalCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.deepForest,
-              borderRadius: BorderRadius.circular(AppRadii.lg),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Icon(
-                LucideIcons.receipt,
-                color: AppColors.electricGreen,
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '共 $total 条，当前显示 $visibleCount 条',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _TransactionListCard extends StatelessWidget {
   const _TransactionListCard._({
     required this.tx,
@@ -845,7 +928,7 @@ class _TransactionListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final txNo = tx.txNo;
     return WebCalCard(
-      onTap: txNo == null ? null : () => context.go('$pathPrefix/$txNo'),
+      onTap: txNo == null ? null : () => context.push('$pathPrefix/$txNo'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

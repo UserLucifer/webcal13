@@ -327,7 +327,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
           )
         : _canViewSettlement(order.orderStatus)
         ? OutlinedButton(
-            onPressed: _acting ? null : () => context.go('/settlements'),
+            onPressed: _acting ? null : () => context.push('/settlements'),
             child: const Text('查看结算记录'),
           )
         : null;
@@ -438,10 +438,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   final no = settlementNo;
                   if (no != null) {
                     ref.invalidate(settlementDetailProvider(no));
-                    context.go('/settlements/$no');
+                    context.push('/settlements/$no');
                     return;
                   }
-                  context.go('/settlements');
+                  context.push('/settlements');
                 },
               ),
         child: Text(_acting ? '处理中...' : '提前结算'),

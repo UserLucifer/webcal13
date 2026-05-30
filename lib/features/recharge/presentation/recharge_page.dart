@@ -30,7 +30,7 @@ String? _validateOptionalHttpUrl(String? value) {
   }
   final uri = Uri.tryParse(text);
   final isHttp = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
-  return isHttp && uri.host.isNotEmpty ? null : '请输入有效的 http/https URL';
+  return isHttp && uri.host.isNotEmpty ? null : '请输入有效的 http/https 链接';
 }
 
 void _invalidateRechargeSideEffects(WidgetRef ref) {
@@ -69,15 +69,9 @@ class _RechargePageState extends ConsumerState<RechargePage> {
   final _proofController = TextEditingController();
   final _externalTxController = TextEditingController();
   final _remarkController = TextEditingController();
-  final _moreRecords = <RechargeOrder>[];
   int? _channelId;
-  int _loadedMoreRecordPages = 0;
-  int _recordPagingVersion = 0;
   bool _submitting = false;
   bool _confirmingSubmit = false;
-  bool _loadingMoreRecords = false;
-  bool _reachedRecordsEnd = false;
-  String? _loadMoreRecordsError;
   String? _clientRequestId;
 
   @override
@@ -109,20 +103,8 @@ class _RechargePageState extends ConsumerState<RechargePage> {
     setState(() => _clientRequestId = null);
   }
 
-  void _clearRecordPaging() {
-    _recordPagingVersion += 1;
-    _moreRecords.clear();
-    _loadedMoreRecordPages = 0;
-    _loadingMoreRecords = false;
-    _reachedRecordsEnd = false;
-    _loadMoreRecordsError = null;
-  }
-
   void _refresh() {
-    setState(() {
-      _clientRequestId = null;
-      _clearRecordPaging();
-    });
+    setState(() => _clientRequestId = null);
     ref.invalidate(businessConfigProvider);
     ref.invalidate(rechargeChannelsProvider);
     _invalidateRechargeSideEffects(ref);
@@ -145,41 +127,6 @@ class _RechargePageState extends ConsumerState<RechargePage> {
     );
   }
 
-  Future<void> _loadMoreRecords(PageResult<RechargeOrder> page) async {
-    if (_loadingMoreRecords || _reachedRecordsEnd) {
-      return;
-    }
-    final requestVersion = _recordPagingVersion;
-    setState(() {
-      _loadingMoreRecords = true;
-      _loadMoreRecordsError = null;
-    });
-    try {
-      final nextPage = await ref
-          .read(rechargeRepositoryProvider)
-          .orders(pageNo: page.pageNo + _loadedMoreRecordPages + 1);
-      if (!mounted || requestVersion != _recordPagingVersion) {
-        return;
-      }
-      setState(() {
-        final totalVisible =
-            page.records.length + _moreRecords.length + nextPage.records.length;
-        _moreRecords.addAll(nextPage.records);
-        _loadedMoreRecordPages += 1;
-        _reachedRecordsEnd =
-            nextPage.records.isEmpty || totalVisible >= nextPage.total;
-      });
-    } catch (error) {
-      if (mounted && requestVersion == _recordPagingVersion) {
-        setState(() => _loadMoreRecordsError = friendlyErrorMessage(error));
-      }
-    } finally {
-      if (mounted && requestVersion == _recordPagingVersion) {
-        setState(() => _loadingMoreRecords = false);
-      }
-    }
-  }
-
   Future<void> _submit() async {
     if (_submitting || _confirmingSubmit) {
       return;
@@ -198,35 +145,61 @@ class _RechargePageState extends ConsumerState<RechargePage> {
     setState(() => _confirmingSubmit = true);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认提交充值'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            InfoRow(label: '充值金额', value: _money(applyAmount, null)),
-            InfoRow(label: '充值渠道', value: channel?.channelName ?? '--'),
-            InfoRow(label: '网络', value: channel?.network ?? '--'),
-            InfoRow(label: '收款账户', value: channel?.accountNo ?? '--'),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '审核状态和实际到账金额以后端结果为准。',
-              style: Theme.of(context).textTheme.bodySmall,
+      builder: (context) {
+        final dialogWidth = (MediaQuery.sizeOf(context).width - 96)
+            .clamp(220.0, 360.0)
+            .toDouble();
+
+        return AlertDialog(
+          title: const Text('确认提交充值'),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DialogInfoRow(
+                    label: '充值金额',
+                    value: _money(applyAmount, null),
+                  ),
+                  DialogInfoRow(
+                    label: '充值渠道',
+                    value: channel?.channelName ?? '--',
+                  ),
+                  DialogInfoRow(label: '网络', value: channel?.network ?? '--'),
+                  DialogInfoRow(
+                    label: '收款账户',
+                    value: channel?.accountNo ?? '--',
+                  ),
+                  if (externalTxNo.isNotEmpty)
+                    DialogInfoRow(label: '交易哈希', value: externalTxNo),
+                  if (paymentProofUrl.isNotEmpty)
+                    DialogInfoRow(label: '付款截图链接', value: paymentProofUrl),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    paymentProofUrl.isEmpty && externalTxNo.isEmpty
+                        ? '建议填写交易哈希或付款截图链接，方便审核。审核状态和实际到账金额以后端结果为准。'
+                        : '审核状态和实际到账金额以后端结果为准。',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+          ),
+          actions: [
             OutlinedButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('返回修改'),
             ),
-            const SizedBox(height: AppSpacing.sm),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
               icon: const Icon(LucideIcons.check),
               label: const Text('确认提交'),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
     if (!mounted) {
       return;
@@ -253,10 +226,7 @@ class _RechargePageState extends ConsumerState<RechargePage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _clientRequestId = null;
-        _clearRecordPaging();
-      });
+      setState(() => _clientRequestId = null);
       _invalidateRechargeSideEffects(ref);
       final detailPath = order.rechargeNo == null
           ? '/recharge'
@@ -293,12 +263,18 @@ class _RechargePageState extends ConsumerState<RechargePage> {
   @override
   Widget build(BuildContext context) {
     final channels = ref.watch(rechargeChannelsProvider);
-    final records = ref.watch(rechargeOrdersProvider);
     final businessConfig = ref.watch(businessConfigProvider);
     final rechargeMinAmount = businessConfig.valueOrNull?.rechargeMinAmount;
 
     return ScreenScaffold(
       title: '提交充值',
+      actions: [
+        IconButton(
+          onPressed: () => context.push('/recharge/records'),
+          icon: const Icon(LucideIcons.receipt),
+          tooltip: '充值记录',
+        ),
+      ],
       onRefresh: _refresh,
       children: [
         AsyncStateView(
@@ -426,7 +402,9 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                     TextFormField(
                       controller: _proofController,
                       decoration: const InputDecoration(
-                        labelText: '付款凭证 URL（可选）',
+                        labelText: '付款截图链接（可选）',
+                        helperText: '如有付款截图，可粘贴图片链接；没有链接时可只填写交易哈希。',
+                        helperMaxLines: 2,
                       ),
                       keyboardType: TextInputType.url,
                       textInputAction: TextInputAction.next,
@@ -453,69 +431,6 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                   ],
                 ),
               ),
-            );
-          },
-        ),
-        const SectionTitle(title: '充值记录'),
-        AsyncStateView(
-          value: records,
-          onRetry: _refresh,
-          builder: (page) {
-            final allRecords = [...page.records, ..._moreRecords];
-            final hasMore =
-                !_reachedRecordsEnd && allRecords.length < page.total;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _RechargeRecordSummary(
-                  total: page.total,
-                  visibleCount: allRecords.length,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (allRecords.isEmpty)
-                  const EmptyCard(
-                    title: '暂无充值记录',
-                    subtitle: '提交充值后可在这里查看审核和入账进度。',
-                    icon: LucideIcons.receipt,
-                  )
-                else ...[
-                  for (final order in allRecords)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _RechargeRecordCard(order: order),
-                    ),
-                  if (_loadMoreRecordsError != null) ...[
-                    ErrorCard(
-                      message: _loadMoreRecordsError!,
-                      onRetry: () => _loadMoreRecords(page),
-                    ),
-                  ] else if (hasMore) ...[
-                    OutlinedButton.icon(
-                      onPressed: _loadingMoreRecords
-                          ? null
-                          : () => _loadMoreRecords(page),
-                      icon: _loadingMoreRecords
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(LucideIcons.chevronsDown),
-                      label: Text(_loadingMoreRecords ? '加载中...' : '加载更多'),
-                    ),
-                  ] else ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: Text(
-                        '已显示全部充值记录',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ),
-                  ],
-                ],
-              ],
             );
           },
         ),
@@ -557,86 +472,179 @@ String _channelDropdownLabel(RechargeChannel channel) {
   return '充值渠道';
 }
 
-class _RechargeRecordSummary extends StatelessWidget {
-  const _RechargeRecordSummary({
-    required this.total,
-    required this.visibleCount,
-  });
+class RechargeRecordsPage extends ConsumerStatefulWidget {
+  const RechargeRecordsPage({super.key});
 
-  final int total;
-  final int visibleCount;
+  @override
+  ConsumerState<RechargeRecordsPage> createState() =>
+      _RechargeRecordsPageState();
+}
+
+class _RechargeRecordsPageState extends ConsumerState<RechargeRecordsPage> {
+  final _moreRecords = <RechargeOrder>[];
+  int _loadedMorePages = 0;
+  int _pagingVersion = 0;
+  bool _loadingMore = false;
+  bool _reachedEnd = false;
+  String? _loadMoreError;
+
+  void _clearPaging() {
+    _pagingVersion += 1;
+    _moreRecords.clear();
+    _loadedMorePages = 0;
+    _loadingMore = false;
+    _reachedEnd = false;
+    _loadMoreError = null;
+  }
+
+  void _refresh() {
+    setState(_clearPaging);
+    ref.invalidate(rechargeOrdersProvider);
+  }
+
+  Future<void> _loadMore(PageResult<RechargeOrder> page) async {
+    if (_loadingMore || _reachedEnd) {
+      return;
+    }
+    final requestVersion = _pagingVersion;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final nextPage = await ref
+          .read(rechargeRepositoryProvider)
+          .orders(pageNo: page.pageNo + _loadedMorePages + 1);
+      if (!mounted || requestVersion != _pagingVersion) {
+        return;
+      }
+      setState(() {
+        final totalVisible =
+            page.records.length + _moreRecords.length + nextPage.records.length;
+        _moreRecords.addAll(nextPage.records);
+        _loadedMorePages += 1;
+        _reachedEnd =
+            nextPage.records.isEmpty || totalVisible >= nextPage.total;
+      });
+    } catch (error) {
+      if (mounted && requestVersion == _pagingVersion) {
+        setState(() => _loadMoreError = friendlyErrorMessage(error));
+      }
+    } finally {
+      if (mounted && requestVersion == _pagingVersion) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return WebCalCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.deepForest,
-              borderRadius: BorderRadius.circular(AppRadii.lg),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Icon(
-                LucideIcons.receipt,
-                color: AppColors.electricGreen,
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final orders = ref.watch(rechargeOrdersProvider);
+
+    return ScreenScaffold(
+      title: '充值记录',
+      actions: [
+        IconButton(
+          onPressed: () => context.push('/recharge'),
+          icon: const Icon(LucideIcons.creditCard),
+          tooltip: '提交充值',
+        ),
+      ],
+      onRefresh: _refresh,
+      children: [
+        AsyncStateView(
+          value: orders,
+          loading: const SkeletonList(count: 3),
+          onRetry: _refresh,
+          builder: (page) {
+            final allRecords = [...page.records, ..._moreRecords];
+            final hasMore = !_reachedEnd && allRecords.length < page.total;
+            if (allRecords.isEmpty) {
+              return EmptyCard(
+                title: '暂无充值记录',
+                subtitle: '提交充值后可在这里查看审核和入账进度。',
+                icon: LucideIcons.receipt,
+                action: ElevatedButton.icon(
+                  onPressed: () => context.push('/recharge'),
+                  icon: const Icon(LucideIcons.creditCard),
+                  label: const Text('去充值'),
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '充值记录',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                for (var index = 0; index < allRecords.length; index++) ...[
+                  _RechargeRecordListItem(order: allRecords[index]),
+                  if (index != allRecords.length - 1)
+                    const Divider(
+                      height: AppSpacing.lg,
+                      color: AppColors.outline,
+                    ),
+                ],
+                if (_loadMoreError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  ErrorCard(
+                    message: _loadMoreError!,
+                    onRetry: () => _loadMore(page),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '共 $total 条，当前显示 $visibleCount 条',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                ),
+                ] else if (hasMore) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: _loadingMore ? null : () => _loadMore(page),
+                    icon: _loadingMore
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.chevronsDown),
+                    label: Text(_loadingMore ? '加载中...' : '加载更多'),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      '已显示全部充值记录',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ),
+                ],
               ],
-            ),
-          ),
-        ],
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
-class _RechargeRecordCard extends StatelessWidget {
-  const _RechargeRecordCard({required this.order});
+class _RechargeRecordListItem extends StatelessWidget {
+  const _RechargeRecordListItem({required this.order});
 
   final RechargeOrder order;
 
   @override
   Widget build(BuildContext context) {
     final rechargeNo = order.rechargeNo;
-    return WebCalCard(
-      onTap: rechargeNo == null
-          ? null
-          : () => context.go('/recharge/$rechargeNo'),
+    final metaParts = <String>[
+      if ((order.channelName?.trim().isNotEmpty ?? false))
+        order.channelName!.trim(),
+      if ((order.network?.trim().isNotEmpty ?? false)) order.network!.trim(),
+      DateTimeFormatters.compact(order.createdAt),
+    ];
+    final actualAmount = order.actualAmount?.trim();
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(LucideIcons.wallet, color: AppColors.deepForest),
-              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   _money(order.applyAmount, order.currency),
@@ -651,17 +659,47 @@ class _RechargeRecordCard extends StatelessWidget {
               StatusPill(
                 label: StatusLabels.of(StatusLabels.recharge, order.status),
               ),
+              if (rechargeNo != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 18,
+                  color: AppColors.muted,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          InfoRow(label: '渠道', value: order.channelName ?? '--'),
-          InfoRow(label: '网络', value: order.network ?? '--'),
-          InfoRow(
-            label: '提交时间',
-            value: DateTimeFormatters.compact(order.createdAt),
+          Text(
+            metaParts.isEmpty ? '--' : metaParts.join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            actualAmount == null || actualAmount.isEmpty
+                ? '审核状态和实际到账以后端结果为准'
+                : '实际到账 ${_money(actualAmount, order.currency)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
+    );
+    if (rechargeNo == null) {
+      return content;
+    }
+    return InkWell(
+      onTap: () => context.push('/recharge/$rechargeNo'),
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: content,
     );
   }
 }
@@ -1364,7 +1402,7 @@ class _RechargeNoteCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           if (order.paymentProofUrl != null &&
               order.paymentProofUrl!.isNotEmpty)
-            const InfoRow(label: '付款凭证', value: '已提交'),
+            const InfoRow(label: '付款截图链接', value: '已提交'),
           if (order.externalTxNo != null && order.externalTxNo!.isNotEmpty)
             InfoRow(label: '交易哈希', value: order.externalTxNo!),
           if (order.userRemark != null && order.userRemark!.isNotEmpty)

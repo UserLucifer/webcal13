@@ -311,7 +311,7 @@ class _ApiManagementCard extends StatelessWidget {
     final orderNo = info.orderNo;
 
     return WebCalCard(
-      onTap: orderNo == null ? null : () => context.go('/orders/$orderNo'),
+      onTap: orderNo == null ? null : () => context.push('/orders/$orderNo'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

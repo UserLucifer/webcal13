@@ -612,7 +612,7 @@ class _NotificationCard extends StatelessWidget {
     final id = item.id;
 
     return WebCalCard(
-      onTap: id == null ? null : () => context.go('/notifications/$id'),
+      onTap: id == null ? null : () => context.push('/notifications/$id'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -388,7 +388,7 @@ class _ProductCard extends StatelessWidget {
     return WebCalCard(
       onTap: productCode == null
           ? null
-          : () => context.go('/market/$productCode/order'),
+          : () => context.push('/market/$productCode/order'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -438,7 +438,7 @@ class _ProductCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: productCode == null
                   ? null
-                  : () => context.go('/market/$productCode/order'),
+                  : () => context.push('/market/$productCode/order'),
               icon: const Icon(LucideIcons.calculator),
               label: const Text('费用预估'),
             ),

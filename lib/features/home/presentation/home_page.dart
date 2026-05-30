@@ -168,25 +168,25 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ],
                   ),
                 ).animate().fadeIn(duration: 220.ms).slideY(begin: 0.04),
-                const SectionTitle(title: '快捷操作'),
+                const SizedBox(height: AppSpacing.md),
+                _HomePrimaryPathCard(
+                  onRecharge: () => context.push('/recharge'),
+                  onMarket: () => context.go('/market'),
+                  onOrders: () => context.push('/orders'),
+                ),
+                const SectionTitle(title: '常用入口'),
                 Row(
                   children: [
                     _QuickAction(
-                      label: '充值',
-                      icon: LucideIcons.creditCard,
-                      onTap: () => context.go('/recharge'),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    _QuickAction(
                       label: '提现',
                       icon: LucideIcons.wallet,
-                      onTap: () => context.go('/withdraw'),
+                      onTap: () => context.push('/withdraw'),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     _QuickAction(
-                      label: '租赁',
-                      icon: LucideIcons.cpu,
-                      onTap: () => context.go('/market'),
+                      label: '订单',
+                      icon: LucideIcons.receipt,
+                      onTap: () => context.push('/orders'),
                     ),
                   ],
                 ),
@@ -194,15 +194,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 Row(
                   children: [
                     _QuickAction(
-                      label: '订单',
-                      icon: LucideIcons.receipt,
-                      onTap: () => context.go('/orders'),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    _QuickAction(
                       label: 'API',
                       icon: LucideIcons.activity,
-                      onTap: () => context.go('/apis'),
+                      onTap: () => context.push('/apis'),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     _QuickAction(
@@ -230,7 +224,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       child: WebCalCard(
                         onTap: order.orderNo == null
                             ? null
-                            : () => context.go('/orders/${order.orderNo}'),
+                            : () => context.push('/orders/${order.orderNo}'),
                         child: Row(
                           children: [
                             const Icon(
@@ -360,7 +354,7 @@ class _NotificationAction extends ConsumerWidget {
     final count = unread.valueOrNull?.total ?? 0;
 
     return IconButton(
-      onPressed: () => context.go('/notifications'),
+      onPressed: () => context.push('/notifications'),
       tooltip: '通知中心',
       icon: Stack(
         clipBehavior: Clip.none,
@@ -390,6 +384,195 @@ class _NotificationAction extends ConsumerWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _HomePrimaryPathCard extends StatelessWidget {
+  const _HomePrimaryPathCard({
+    required this.onRecharge,
+    required this.onMarket,
+    required this.onOrders,
+  });
+
+  final VoidCallback onRecharge;
+  final VoidCallback onMarket;
+  final VoidCallback onOrders;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.deepForest,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Icon(
+                    LucideIcons.zap,
+                    size: 20,
+                    color: AppColors.electricGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '开始租赁',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '充值资金 · 选择算力 · 订单运行',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              const StatusPill(label: '3 步'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const Row(
+            children: [
+              _PrimaryPathStep(
+                index: '01',
+                label: '充值资金',
+                icon: LucideIcons.creditCard,
+              ),
+              _PrimaryPathConnector(),
+              _PrimaryPathStep(
+                index: '02',
+                label: '选择算力',
+                icon: LucideIcons.cpu,
+              ),
+              _PrimaryPathConnector(),
+              _PrimaryPathStep(
+                index: '03',
+                label: '订单运行',
+                icon: LucideIcons.server,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onRecharge,
+                  icon: const Icon(LucideIcons.plusCircle),
+                  label: const Text('先充值'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onMarket,
+                  icon: const Icon(LucideIcons.search),
+                  label: const Text('选择算力'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onOrders,
+              icon: const Icon(LucideIcons.arrowRight, size: 16),
+              label: const Text('查看订单进度'),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 220.ms).slideY(begin: 0.04);
+  }
+}
+
+class _PrimaryPathStep extends StatelessWidget {
+  const _PrimaryPathStep({
+    required this.index,
+    required this.label,
+    required this.icon,
+  });
+
+  final String index;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          SizedBox.square(
+            dimension: 44,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.electricGreen.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                border: Border.all(
+                  color: AppColors.electricGreen.withValues(alpha: 0.42),
+                ),
+              ),
+              child: Icon(icon, size: 20, color: AppColors.deepForest),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            index,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrimaryPathConnector extends StatelessWidget {
+  const _PrimaryPathConnector();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: AppSpacing.md,
+      child: Divider(
+        height: 44,
+        thickness: 1.2,
+        color: AppColors.outline.withValues(alpha: 0.9),
       ),
     );
   }

@@ -31,6 +31,15 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
   final _contributionPaging = _PagedAppendState<TeamContributionRank>();
   _ProfitCenterTab _activeTab = _ProfitCenterTab.profit;
 
+  @override
+  void initState() {
+    super.initState();
+    ref.invalidate(profitSummaryProvider);
+    ref.invalidate(todayEstimateProvider);
+    ref.invalidate(profitTrendProvider);
+    ref.invalidate(profitRecordsProvider);
+  }
+
   void _refresh() {
     switch (_activeTab) {
       case _ProfitCenterTab.profit:
@@ -183,6 +192,16 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
           currency: pageCurrency,
         ),
       ),
+      const SizedBox(height: AppSpacing.md),
+      const _BusinessContextCard(
+        icon: LucideIcons.lineChart,
+        title: '收益口径',
+        items: [
+          _BusinessContextItem(label: '来源', value: '运行订单产生收益后展示，实时值来自服务端当前估算。'),
+          _BusinessContextItem(label: '结算', value: '趋势和记录以服务端结算结果为准，不在前端重算收益。'),
+          _BusinessContextItem(label: '为空', value: '没有运行订单或尚未产生结算时，收益记录会保持为空。'),
+        ],
+      ),
       const SectionTitle(title: '收益趋势'),
       AsyncStateView(
         value: trend,
@@ -260,6 +279,16 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         value: commission,
         onRetry: () => ref.invalidate(commissionSummaryProvider),
         builder: (data) => _CommissionHeroCard(summary: data),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      const _BusinessContextCard(
+        icon: LucideIcons.badgeDollarSign,
+        title: '佣金口径',
+        items: [
+          _BusinessContextItem(label: '来源', value: '团队成员产生并结算收益后，才会生成佣金记录。'),
+          _BusinessContextItem(label: '层级', value: '一级、二级佣金按服务端规则和绑定关系返回。'),
+          _BusinessContextItem(label: '为空', value: '成员未产生结算收益时，排行和佣金记录可能为空。'),
+        ],
       ),
       const SectionTitle(title: '贡献排行'),
       AsyncStateView(
@@ -351,6 +380,22 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         value: team,
         onRetry: () => ref.invalidate(teamSummaryProvider),
         builder: (data) => _TeamOverviewCard(summary: data),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      const _BusinessContextCard(
+        icon: LucideIcons.users,
+        title: '团队关系',
+        items: [
+          _BusinessContextItem(
+            label: '绑定',
+            value: '成员通过邀请码注册后进入团队，关系以后端绑定结果为准。',
+          ),
+          _BusinessContextItem(label: '层级', value: '直属、二级和更深层级按服务端团队关系展示。'),
+          _BusinessContextItem(
+            label: '为空',
+            value: '没有邀请成员或成员未完成绑定时，团队列表会保持为空。',
+          ),
+        ],
       ),
       const SectionTitle(title: '团队成员'),
       AsyncStateView(
@@ -534,6 +579,106 @@ class _PagedSummary extends StatelessWidget {
   }
 }
 
+class _BusinessContextCard extends StatelessWidget {
+  const _BusinessContextCard({
+    required this.icon,
+    required this.title,
+    required this.items,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<_BusinessContextItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.electricGreen.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: Icon(icon, size: 18, color: AppColors.deepForest),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (var index = 0; index < items.length; index++) ...[
+            _BusinessContextRow(item: items[index]),
+            if (index != items.length - 1)
+              const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BusinessContextItem {
+  const _BusinessContextItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+class _BusinessContextRow extends StatelessWidget {
+  const _BusinessContextRow({required this.item});
+
+  final _BusinessContextItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 44,
+          child: Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.deepForest,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            item.value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfitRecordCard extends StatelessWidget {
   const _ProfitRecordCard({required this.record, this.currency});
 
@@ -624,10 +769,9 @@ class _ProfitRecordCard extends StatelessWidget {
 }
 
 class _CommissionRecordCard extends StatelessWidget {
-  const _CommissionRecordCard({required this.record, this.currency});
+  const _CommissionRecordCard({required this.record});
 
   final CommissionRecord record;
-  final String? currency;
 
   @override
   Widget build(BuildContext context) {
@@ -677,12 +821,7 @@ class _CommissionRecordCard extends StatelessWidget {
                   children: [
                     StatusPill(label: status),
                     const SizedBox(height: AppSpacing.sm),
-                    _RightAmount(
-                      value: _money(
-                        record.commissionAmount,
-                        currency: currency,
-                      ),
-                    ),
+                    _RightAmount(value: _money(record.commissionAmount)),
                   ],
                 ),
               ),
@@ -690,10 +829,7 @@ class _CommissionRecordCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           if (_hasText(record.sourceProfitAmount))
-            InfoRow(
-              label: '来源收益',
-              value: _money(record.sourceProfitAmount, currency: currency),
-            ),
+            InfoRow(label: '来源收益', value: _money(record.sourceProfitAmount)),
           if (_hasText(record.commissionRateSnapshot))
             InfoRow(
               label: '佣金比例',

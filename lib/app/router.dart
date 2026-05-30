@@ -153,6 +153,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RechargePage(),
       ),
       GoRoute(
+        path: '/recharge/records',
+        builder: (context, state) => const RechargeRecordsPage(),
+      ),
+      GoRoute(
         path: '/recharge/:rechargeNo',
         builder: (context, state) =>
             RechargeDetailPage(rechargeNo: state.pathParameters['rechargeNo']!),
@@ -160,6 +164,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/withdraw',
         builder: (context, state) => const WithdrawPage(),
+      ),
+      GoRoute(
+        path: '/withdraw/records',
+        builder: (context, state) => const WithdrawRecordsPage(),
       ),
       GoRoute(
         path: '/withdraw-addresses',
@@ -268,7 +276,9 @@ bool _isKnownInternalRoute(Uri uri) {
     '/apis',
     '/notifications',
     '/recharge',
+    '/recharge/records',
     '/withdraw',
+    '/withdraw/records',
     '/withdraw-addresses',
     '/settlements',
   };

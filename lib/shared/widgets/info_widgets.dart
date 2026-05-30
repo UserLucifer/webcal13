@@ -136,6 +136,47 @@ class InfoRow extends StatelessWidget {
   }
 }
 
+class DialogInfoRow extends StatelessWidget {
+  const DialogInfoRow({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: AppColors.muted);
+    final valueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: AppColors.ink,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: labelStyle,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: valueStyle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class InlineNotice extends StatelessWidget {
   const InlineNotice({super.key, required this.message, this.warning = false});
 

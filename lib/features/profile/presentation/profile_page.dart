@@ -142,7 +142,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       title: '个人中心',
       actions: [
         IconButton(
-          onPressed: () => context.go('/notifications'),
+          onPressed: () => context.push('/notifications'),
           icon: const Icon(LucideIcons.bell),
           tooltip: '通知中心',
         ),
@@ -154,7 +154,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           onRetry: () => ref.invalidate(currentUserProvider),
           builder: (data) => _ProfileIdentityCard(
             user: data,
-            onAvatarTap: () => context.go('/profile/avatar'),
+            onAvatarTap: () => context.push('/profile/avatar'),
           ),
         ),
         const SectionTitle(title: '资产与交易'),
@@ -170,13 +170,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               icon: LucideIcons.creditCard,
               title: '充值',
               subtitle: '提交充值和查看记录',
-              onTap: () => context.go('/recharge'),
+              onTap: () => context.push('/recharge'),
             ),
             _ProfileMenuItem(
               icon: LucideIcons.landmark,
               title: '提现地址',
               subtitle: '新增、编辑和管理提现地址',
-              onTap: () => context.go('/withdraw-addresses'),
+              onTap: () => context.push('/withdraw-addresses'),
             ),
           ],
         ),
@@ -187,13 +187,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               icon: LucideIcons.receipt,
               title: '租赁订单',
               subtitle: '支付、部署和运行状态',
-              onTap: () => context.go('/orders'),
+              onTap: () => context.push('/orders'),
             ),
             _ProfileMenuItem(
               icon: LucideIcons.activity,
               title: 'API 管理',
               subtitle: '查看可用凭证和服务阶段',
-              onTap: () => context.go('/apis'),
+              onTap: () => context.push('/apis'),
             ),
             _ProfileMenuItem(
               icon: LucideIcons.users,
@@ -205,7 +205,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               icon: LucideIcons.checkCircle,
               title: '结算记录',
               subtitle: '提前结算和到期结算结果',
-              onTap: () => context.go('/settlements'),
+              onTap: () => context.push('/settlements'),
             ),
           ],
         ),
@@ -226,7 +226,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               icon: LucideIcons.bell,
               title: '通知中心',
               subtitle: '账户、订单和系统消息',
-              onTap: () => context.go('/notifications'),
+              onTap: () => context.push('/notifications'),
             ),
           ],
         ),
@@ -257,40 +257,44 @@ class _ProfileIdentityCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Tooltip(
-                message: '更换头像',
+              Semantics(
+                button: true,
+                label: '更换头像',
                 child: InkWell(
                   onTap: onAvatarTap,
                   borderRadius: BorderRadius.circular(AppRadii.lg),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      ProfileAvatar(
-                        name: displayName,
-                        avatarKey: user.avatarKey,
-                        size: 64,
-                        radius: AppRadii.lg,
-                      ),
-                      Positioned(
-                        right: -4,
-                        bottom: -4,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.deepForest,
-                            borderRadius: BorderRadius.circular(AppRadii.sm),
-                            border: Border.all(color: AppColors.paper),
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.all(AppSpacing.xs),
-                            child: Icon(
-                              LucideIcons.camera,
-                              size: 14,
-                              color: AppColors.electricGreen,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ProfileAvatar(
+                          name: displayName,
+                          avatarKey: user.avatarKey,
+                          size: 68,
+                          radius: AppRadii.lg,
+                        ),
+                        Positioned(
+                          right: -4,
+                          bottom: -4,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.deepForest,
+                              borderRadius: BorderRadius.circular(AppRadii.sm),
+                              border: Border.all(color: AppColors.paper),
+                            ),
+                            child: const Padding(
+                              padding: EdgeInsets.all(AppSpacing.xs),
+                              child: Icon(
+                                LucideIcons.camera,
+                                size: 14,
+                                color: AppColors.electricGreen,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -307,7 +311,7 @@ class _ProfileIdentityCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       user.email ?? '--',
                       maxLines: 1,
@@ -315,19 +319,6 @@ class _ProfileIdentityCard extends StatelessWidget {
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    TextButton.icon(
-                      onPressed: onAvatarTap,
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
-                        ),
-                        foregroundColor: AppColors.deepForest,
-                      ),
-                      icon: const Icon(LucideIcons.camera, size: 16),
-                      label: const Text('更换头像'),
                     ),
                   ],
                 ),

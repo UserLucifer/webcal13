@@ -66,17 +66,11 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _codeController = TextEditingController();
-  final _moreRecords = <WithdrawOrder>[];
   int? _addressId;
-  int _loadedMoreRecordPages = 0;
-  int _recordPagingVersion = 0;
   bool _submitting = false;
   bool _confirmingSubmit = false;
   bool _sending = false;
-  bool _loadingMoreRecords = false;
-  bool _reachedRecordsEnd = false;
   int _codeCooldown = 0;
-  String? _loadMoreRecordsError;
   String? _clientRequestId;
   Timer? _codeTimer;
 
@@ -104,23 +98,11 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     setState(() => _clientRequestId = null);
   }
 
-  void _clearRecordPaging() {
-    _recordPagingVersion += 1;
-    _moreRecords.clear();
-    _loadedMoreRecordPages = 0;
-    _loadingMoreRecords = false;
-    _reachedRecordsEnd = false;
-    _loadMoreRecordsError = null;
-  }
-
   void _refresh() {
-    setState(() {
-      _clientRequestId = null;
-      _clearRecordPaging();
-    });
+    setState(() => _clientRequestId = null);
     ref.invalidate(businessConfigProvider);
     ref.invalidate(withdrawAddressesProvider);
-    _invalidateWithdrawSideEffects(ref);
+    ref.invalidate(walletProvider);
   }
 
   Future<void> _copyText(String value) async {
@@ -138,41 +120,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
       title: const Text('地址已复制'),
       autoCloseDuration: const Duration(seconds: 2),
     );
-  }
-
-  Future<void> _loadMoreRecords(PageResult<WithdrawOrder> page) async {
-    if (_loadingMoreRecords || _reachedRecordsEnd) {
-      return;
-    }
-    final requestVersion = _recordPagingVersion;
-    setState(() {
-      _loadingMoreRecords = true;
-      _loadMoreRecordsError = null;
-    });
-    try {
-      final nextPage = await ref
-          .read(withdrawRepositoryProvider)
-          .orders(pageNo: page.pageNo + _loadedMoreRecordPages + 1);
-      if (!mounted || requestVersion != _recordPagingVersion) {
-        return;
-      }
-      setState(() {
-        final totalVisible =
-            page.records.length + _moreRecords.length + nextPage.records.length;
-        _moreRecords.addAll(nextPage.records);
-        _loadedMoreRecordPages += 1;
-        _reachedRecordsEnd =
-            nextPage.records.isEmpty || totalVisible >= nextPage.total;
-      });
-    } catch (error) {
-      if (mounted && requestVersion == _recordPagingVersion) {
-        setState(() => _loadMoreRecordsError = friendlyErrorMessage(error));
-      }
-    } finally {
-      if (mounted && requestVersion == _recordPagingVersion) {
-        setState(() => _loadingMoreRecords = false);
-      }
-    }
   }
 
   void _startCodeCooldown() {
@@ -250,34 +197,51 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     setState(() => _confirmingSubmit = true);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认提现'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            InfoRow(label: '提现金额', value: _money(applyAmount, currency)),
-            InfoRow(label: '网络', value: address?.network ?? '--'),
-            InfoRow(label: '提现地址', value: address?.accountNo ?? '--'),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '手续费、实际到账和状态以后端审核结果为准。',
-              style: Theme.of(context).textTheme.bodySmall,
+      builder: (context) {
+        final dialogWidth = (MediaQuery.sizeOf(context).width - 96)
+            .clamp(220.0, 360.0)
+            .toDouble();
+
+        return AlertDialog(
+          title: const Text('确认提现'),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DialogInfoRow(
+                    label: '提现金额',
+                    value: _money(applyAmount, currency),
+                  ),
+                  DialogInfoRow(label: '网络', value: address?.network ?? '--'),
+                  DialogInfoRow(
+                    label: '提现地址',
+                    value: address?.accountNo ?? '--',
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    '手续费、实际到账和状态以后端审核结果为准。',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+          ),
+          actions: [
             OutlinedButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('返回修改'),
             ),
-            const SizedBox(height: AppSpacing.sm),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
               icon: const Icon(LucideIcons.check),
               label: const Text('确认提交'),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
     if (!mounted) {
       return;
@@ -306,7 +270,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
         _clientRequestId = null;
         _amountController.clear();
         _codeController.clear();
-        _clearRecordPaging();
       });
       _invalidateWithdrawSideEffects(ref);
       final detailPath = order.withdrawNo == null
@@ -345,7 +308,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
   Widget build(BuildContext context) {
     final wallet = ref.watch(walletProvider);
     final addresses = ref.watch(withdrawAddressesProvider);
-    final orders = ref.watch(withdrawOrdersProvider);
     final businessConfig = ref.watch(businessConfigProvider);
     final withdrawMinAmount = businessConfig.valueOrNull?.withdrawMinAmount;
     final walletCurrency = wallet.valueOrNull?.currency;
@@ -361,6 +323,13 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
 
     return ScreenScaffold(
       title: '提现申请',
+      actions: [
+        IconButton(
+          onPressed: () => context.push('/withdraw/records'),
+          icon: const Icon(LucideIcons.receipt),
+          tooltip: '提现记录',
+        ),
+      ],
       bottom: _WithdrawSubmitBar(
         submitting: _submitting || _confirmingSubmit,
         onSubmit: canSubmit ? _submit : null,
@@ -387,7 +356,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                 subtitle: '请先添加提现地址后再提交提现申请。',
                 icon: LucideIcons.walletCards,
                 action: ElevatedButton.icon(
-                  onPressed: () => context.go('/withdraw-addresses/new'),
+                  onPressed: () => context.push('/withdraw-addresses/new'),
                   icon: const Icon(LucideIcons.plus),
                   label: const Text('新增提现地址'),
                 ),
@@ -520,69 +489,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
             );
           },
         ),
-        const SectionTitle(title: '提现记录'),
-        AsyncStateView(
-          value: orders,
-          onRetry: _refresh,
-          builder: (page) {
-            final allRecords = [...page.records, ..._moreRecords];
-            final hasMore =
-                !_reachedRecordsEnd && allRecords.length < page.total;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (allRecords.isEmpty)
-                  const EmptyCard(
-                    title: '暂无提现记录',
-                    subtitle: '提交提现后可在这里查看审核和打款进度。',
-                    icon: LucideIcons.receipt,
-                  )
-                else ...[
-                  for (var index = 0; index < allRecords.length; index++) ...[
-                    _WithdrawRecordListItem(order: allRecords[index]),
-                    if (index != allRecords.length - 1)
-                      const Divider(
-                        height: AppSpacing.lg,
-                        color: AppColors.outline,
-                      ),
-                  ],
-                  if (_loadMoreRecordsError != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    ErrorCard(
-                      message: _loadMoreRecordsError!,
-                      onRetry: () => _loadMoreRecords(page),
-                    ),
-                  ] else if (hasMore) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    OutlinedButton.icon(
-                      onPressed: _loadingMoreRecords
-                          ? null
-                          : () => _loadMoreRecords(page),
-                      icon: _loadingMoreRecords
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(LucideIcons.chevronsDown),
-                      label: Text(_loadingMoreRecords ? '加载中...' : '加载更多'),
-                    ),
-                  ] else ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: Text(
-                        '已显示全部提现记录',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                      ),
-                    ),
-                  ],
-                ],
-              ],
-            );
-          },
-        ),
       ],
     );
   }
@@ -607,6 +513,156 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
       }
     }
     return null;
+  }
+}
+
+class WithdrawRecordsPage extends ConsumerStatefulWidget {
+  const WithdrawRecordsPage({super.key});
+
+  @override
+  ConsumerState<WithdrawRecordsPage> createState() =>
+      _WithdrawRecordsPageState();
+}
+
+class _WithdrawRecordsPageState extends ConsumerState<WithdrawRecordsPage> {
+  final _moreRecords = <WithdrawOrder>[];
+  int _loadedMorePages = 0;
+  int _pagingVersion = 0;
+  bool _loadingMore = false;
+  bool _reachedEnd = false;
+  String? _loadMoreError;
+
+  void _clearPaging() {
+    _pagingVersion += 1;
+    _moreRecords.clear();
+    _loadedMorePages = 0;
+    _loadingMore = false;
+    _reachedEnd = false;
+    _loadMoreError = null;
+  }
+
+  void _refresh() {
+    setState(_clearPaging);
+    ref.invalidate(withdrawOrdersProvider);
+  }
+
+  Future<void> _loadMore(PageResult<WithdrawOrder> page) async {
+    if (_loadingMore || _reachedEnd) {
+      return;
+    }
+    final requestVersion = _pagingVersion;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreError = null;
+    });
+    try {
+      final nextPage = await ref
+          .read(withdrawRepositoryProvider)
+          .orders(pageNo: page.pageNo + _loadedMorePages + 1);
+      if (!mounted || requestVersion != _pagingVersion) {
+        return;
+      }
+      setState(() {
+        final totalVisible =
+            page.records.length + _moreRecords.length + nextPage.records.length;
+        _moreRecords.addAll(nextPage.records);
+        _loadedMorePages += 1;
+        _reachedEnd =
+            nextPage.records.isEmpty || totalVisible >= nextPage.total;
+      });
+    } catch (error) {
+      if (mounted && requestVersion == _pagingVersion) {
+        setState(() => _loadMoreError = friendlyErrorMessage(error));
+      }
+    } finally {
+      if (mounted && requestVersion == _pagingVersion) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orders = ref.watch(withdrawOrdersProvider);
+
+    return ScreenScaffold(
+      title: '提现记录',
+      actions: [
+        IconButton(
+          onPressed: () => context.push('/withdraw'),
+          icon: const Icon(LucideIcons.badgeDollarSign),
+          tooltip: '提交提现',
+        ),
+      ],
+      onRefresh: _refresh,
+      children: [
+        AsyncStateView(
+          value: orders,
+          loading: const SkeletonList(count: 3),
+          onRetry: _refresh,
+          builder: (page) {
+            final allRecords = [...page.records, ..._moreRecords];
+            final hasMore = !_reachedEnd && allRecords.length < page.total;
+            if (allRecords.isEmpty) {
+              return EmptyCard(
+                title: '暂无提现记录',
+                subtitle: '提交提现后可在这里查看审核和打款进度。',
+                icon: LucideIcons.receipt,
+                action: ElevatedButton.icon(
+                  onPressed: () => context.push('/withdraw'),
+                  icon: const Icon(LucideIcons.badgeDollarSign),
+                  label: const Text('去提现'),
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < allRecords.length; index++) ...[
+                  _WithdrawRecordListItem(order: allRecords[index]),
+                  if (index != allRecords.length - 1)
+                    const Divider(
+                      height: AppSpacing.lg,
+                      color: AppColors.outline,
+                    ),
+                ],
+                if (_loadMoreError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  ErrorCard(
+                    message: _loadMoreError!,
+                    onRetry: () => _loadMore(page),
+                  ),
+                ] else if (hasMore) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: _loadingMore ? null : () => _loadMore(page),
+                    icon: _loadingMore
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.chevronsDown),
+                    label: Text(_loadingMore ? '加载中...' : '加载更多'),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      '已显示全部提现记录',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 
@@ -709,7 +765,7 @@ class _WithdrawRecordListItem extends StatelessWidget {
       return content;
     }
     return InkWell(
-      onTap: () => context.go('/withdraw/$withdrawNo'),
+      onTap: () => context.push('/withdraw/$withdrawNo'),
       borderRadius: BorderRadius.circular(AppRadii.md),
       child: content,
     );
@@ -1451,7 +1507,7 @@ class _WithdrawAddressListPageState
       title: '提现地址',
       actions: [
         IconButton(
-          onPressed: () => context.go('/withdraw-addresses/new'),
+          onPressed: () => context.push('/withdraw-addresses/new'),
           icon: const Icon(LucideIcons.plus),
           tooltip: '新增地址',
         ),
@@ -1471,7 +1527,7 @@ class _WithdrawAddressListPageState
                 subtitle: '添加地址后，提现申请时可以直接选择已保存地址。',
                 icon: LucideIcons.walletCards,
                 action: ElevatedButton.icon(
-                  onPressed: () => context.go('/withdraw-addresses/new'),
+                  onPressed: () => context.push('/withdraw-addresses/new'),
                   icon: const Icon(LucideIcons.plus),
                   label: const Text('新增提现地址'),
                 ),
@@ -1489,7 +1545,7 @@ class _WithdrawAddressListPageState
                       address: address,
                       busy: _busyAddressId == address.addressId,
                       onCopy: () => _copyAddress(address),
-                      onEdit: () => context.go(
+                      onEdit: () => context.push(
                         '/withdraw-addresses/${address.addressId}/edit',
                       ),
                       onSetDefault: _isDefaultAddress(address)
@@ -1569,7 +1625,11 @@ class _WithdrawAddressFormPageState
           title: Text(widget.addressId == null ? '提现地址已新增' : '提现地址已保存'),
           autoCloseDuration: const Duration(seconds: 2),
         );
-        context.go('/withdraw-addresses');
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/withdraw-addresses');
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -1751,7 +1811,7 @@ class _WithdrawAddressSummary extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => context.go('/withdraw'),
+            onPressed: () => context.push('/withdraw'),
             child: const Text('去提现'),
           ),
         ],

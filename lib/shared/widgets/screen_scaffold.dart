@@ -116,8 +116,14 @@ String? _fallbackBackPath(String path) {
   if (path == '/recharge') {
     return '/wallet';
   }
+  if (path == '/recharge/records') {
+    return '/recharge';
+  }
   if (path == '/withdraw') {
     return '/wallet';
+  }
+  if (path == '/withdraw/records') {
+    return '/withdraw';
   }
   if (path == '/withdraw-addresses') {
     return '/profile';
@@ -141,10 +147,10 @@ String? _fallbackBackPath(String path) {
     return '/notifications';
   }
   if (segments.length == 2 && segments[0] == 'recharge') {
-    return '/recharge';
+    return '/recharge/records';
   }
   if (segments.length == 2 && segments[0] == 'withdraw') {
-    return '/withdraw';
+    return '/withdraw/records';
   }
   if (segments.length == 2 &&
       segments[0] == 'withdraw-addresses' &&

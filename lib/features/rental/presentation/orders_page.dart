@@ -331,7 +331,7 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final orderNo = order.orderNo;
     return WebCalCard(
-      onTap: orderNo == null ? null : () => context.go('/orders/$orderNo'),
+      onTap: orderNo == null ? null : () => context.push('/orders/$orderNo'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
