@@ -150,7 +150,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     return AuthShell(
       title: '创建账号',
-      subtitle: '注册后可直接进入首页，钱包和团队关系由后端初始化。',
+      subtitle: '注册即开启算力租赁，资产收益一目了然。',
       footer: Wrap(
         alignment: WrapAlignment.center,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -237,14 +237,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.name],
+                  inputFormatters: [LengthLimitingTextInputFormatter(64)],
                   decoration: const InputDecoration(
                     labelText: '昵称',
                     prefixIcon: Icon(LucideIcons.user),
                   ),
-                  maxLength: 64,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    final nickname = value?.trim() ?? '';
+                    if (nickname.isEmpty) {
                       return '请输入昵称';
+                    }
+                    if (nickname.length > 64) {
+                      return '昵称最多 64 个字符';
                     }
                     return null;
                   },

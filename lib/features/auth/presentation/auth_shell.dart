@@ -8,13 +8,13 @@ class AuthShell extends StatelessWidget {
   const AuthShell({
     super.key,
     required this.title,
-    required this.subtitle,
     required this.children,
+    this.subtitle,
     this.footer,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final List<Widget> children;
   final Widget? footer;
 
@@ -46,16 +46,18 @@ class AuthShell extends StatelessWidget {
                       color: AppColors.ink,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    subtitle,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.muted,
-                      height: 1.4,
+                  if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      subtitle!,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.muted,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   ...children,
                 ],

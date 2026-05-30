@@ -31,17 +31,6 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
   final _contributionPaging = _PagedAppendState<TeamContributionRank>();
   _ProfitCenterTab _activeTab = _ProfitCenterTab.profit;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _invalidateProfitProviders();
-    });
-  }
-
   void _invalidateProfitProviders() {
     ref.invalidate(profitSummaryProvider);
     ref.invalidate(todayEstimateProvider);
