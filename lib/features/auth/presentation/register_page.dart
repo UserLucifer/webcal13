@@ -122,10 +122,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           userName: _nameController.text.trim(),
           inviteCode: _inviteController.text.trim(),
         );
-    final state = ref.read(authControllerProvider);
     if (!mounted) {
       return;
     }
+    final state = ref.read(authControllerProvider);
     state.whenOrNull(
       data: (session) {
         if (session != null) {

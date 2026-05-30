@@ -34,6 +34,15 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _invalidateProfitProviders();
+    });
+  }
+
+  void _invalidateProfitProviders() {
     ref.invalidate(profitSummaryProvider);
     ref.invalidate(todayEstimateProvider);
     ref.invalidate(profitTrendProvider);
@@ -44,10 +53,7 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
     switch (_activeTab) {
       case _ProfitCenterTab.profit:
         setState(_profitPaging.reset);
-        ref.invalidate(profitSummaryProvider);
-        ref.invalidate(todayEstimateProvider);
-        ref.invalidate(profitTrendProvider);
-        ref.invalidate(profitRecordsProvider);
+        _invalidateProfitProviders();
       case _ProfitCenterTab.commission:
         setState(() {
           _commissionPaging.reset();

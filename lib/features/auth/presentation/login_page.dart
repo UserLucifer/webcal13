@@ -42,10 +42,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     await ref
         .read(authControllerProvider.notifier)
         .login(_emailController.text.trim(), _passwordController.text);
-    final state = ref.read(authControllerProvider);
     if (!mounted) {
       return;
     }
+    final state = ref.read(authControllerProvider);
     state.whenOrNull(
       data: (session) {
         if (session != null) {

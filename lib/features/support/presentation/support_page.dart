@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -49,7 +47,6 @@ class _SupportPageState extends State<SupportPage> {
               });
             }
           },
-          onPageFinished: (_) => _openChatwayWidget(),
           onWebResourceError: (error) {
             if (mounted && error.isForMainFrame == true) {
               setState(() => _hasLoadError = true);
@@ -69,30 +66,6 @@ class _SupportPageState extends State<SupportPage> {
       _chatwayHtml,
       baseUrl: 'https://webcal.app/support',
     );
-  }
-
-  Future<void> _openChatwayWidget() async {
-    await _runOpenChatwayScript();
-    unawaited(
-      Future<void>.delayed(
-        const Duration(seconds: 1),
-        () => _runOpenChatwayScript(80),
-      ),
-    );
-    unawaited(
-      Future<void>.delayed(
-        const Duration(seconds: 3),
-        () => _runOpenChatwayScript(80),
-      ),
-    );
-  }
-
-  Future<void> _runOpenChatwayScript([int remaining = 120]) async {
-    try {
-      await _controller.runJavaScript('openChatwayWhenReady($remaining);');
-    } catch (_) {
-      // The Chatway script remains available through the on-page widget button.
-    }
   }
 
   @override
@@ -226,135 +199,26 @@ const _chatwayHtml = r'''
       line-height: 1.55;
     }
 
-    button {
-      width: 100%;
-      min-height: 48px;
-      margin-top: 18px;
-      border: 0;
-      border-radius: 14px;
-      background: #163300;
-      color: #9fe870;
-      font: inherit;
-      font-size: 15px;
-      font-weight: 800;
-    }
   </style>
   <script>
-    function chatwayApi() {
-      if (typeof $chatway !== 'undefined') {
-        return $chatway;
-      }
-      if (window.$chatway) {
-        return window.$chatway;
-      }
-      return null;
-    }
-
-    function isChatwayOpen() {
-      var container = document.querySelector('.chatway--container');
-      return !!(
-        container && container.classList.contains('widget--open')
-      );
-    }
-
-    function forceOpenChatwayWidget() {
-      var api = chatwayApi();
-      if (api && typeof api.openChatwayWidget === 'function') {
-        api.openChatwayWidget();
-      }
-
-      window.setTimeout(function() {
-        if (isChatwayOpen()) {
-          return;
-        }
-
-        var trigger = document.querySelector('#chatway_widget_trigger');
-        var launcher =
-          document.querySelector('.chatway-launcher') ||
-          document.querySelector('.launcher-default-open-icon') ||
-          document.querySelector('.launcher-icon');
-
-        if (trigger && typeof trigger.click === 'function') {
-          trigger.click();
-        }
-        if (!isChatwayOpen() && launcher && typeof launcher.click === 'function') {
-          launcher.click();
-        }
-      }, 100);
-
-      window.setTimeout(function() {
-        if (isChatwayOpen()) {
-          return;
-        }
-
-        var container = document.querySelector('.chatway--container');
-        var frame = document.querySelector('.chatway--frame-container');
-        if (container) {
-          container.classList.remove('disable--widget');
-          container.classList.remove('hide--widget');
-          container.classList.add('widget--open');
-          document.body.classList.add('chatway-is-open');
-        }
-        if (frame) {
-          frame.classList.remove('chatway--preview--only--container');
-          frame.classList.remove('chatway--quick--reply--container');
-          frame.classList.add('chatway--chat--widget--container');
-        }
-
-        var iframe = document.getElementById('chatway_widget_app');
-        if (iframe && typeof iframe.focus === 'function') {
-          iframe.focus();
-        }
-      }, 300);
-
-      return isChatwayOpen();
-    }
-
-    function openChatwayWhenReady(remaining) {
-      if (forceOpenChatwayWidget()) {
-        return;
-      }
-      if (remaining > 0) {
-        window.setTimeout(function() {
-          openChatwayWhenReady(remaining - 1);
-        }, 250);
-      }
-    }
-
-    window.$chatwayOnLoad = function() {
-      openChatwayWhenReady(120);
-    };
-
     function notifyChatwayError() {
       if (window.WebCalSupport) {
         window.WebCalSupport.postMessage('widget_load_failed');
       }
     }
-
-    window.addEventListener('load', function() {
-      openChatwayWhenReady(120);
-    });
-
-    document.addEventListener('chatwayLoaded', function() {
-      openChatwayWhenReady(120);
-    });
   </script>
 </head>
 <body>
   <main class="page" aria-label="WebCal 在线客服">
     <section class="card">
       <div class="badge">WebCal Support</div>
-      <h1>正在打开客服聊天</h1>
-      <p>点击在线客服后会自动展开聊天窗口。如未展开，请点击下方按钮。</p>
-      <button type="button" onclick="openChatwayWhenReady(120)">
-        打开客服
-      </button>
+      <h1>在线客服</h1>
+      <p>客服入口已加载，点击右下角客服按钮开始聊天。</p>
     </section>
   </main>
   <script
     id="chatway"
     async
-    onload="openChatwayWhenReady(120)"
     onerror="notifyChatwayError()"
     src="https://cdn.chatway.app/widget.js?id=w1imp1TIzXva">
   </script>
