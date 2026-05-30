@@ -228,6 +228,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               subtitle: '账户、订单和系统消息',
               onTap: () => context.push('/notifications'),
             ),
+            _ProfileMenuItem(
+              icon: LucideIcons.messagesSquare,
+              title: '在线客服',
+              subtitle: '咨询充值、订单、提现和账户问题',
+              onTap: () => context.push('/support'),
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),

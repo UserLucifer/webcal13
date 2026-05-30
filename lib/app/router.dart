@@ -18,6 +18,7 @@ import '../features/rental/presentation/order_confirm_page.dart';
 import '../features/rental/presentation/order_detail_page.dart';
 import '../features/rental/presentation/orders_page.dart';
 import '../features/settlement/presentation/settlement_page.dart';
+import '../features/support/presentation/support_page.dart';
 import '../features/wallet/presentation/wallet_page.dart';
 import '../features/withdraw/presentation/withdraw_page.dart';
 import '../shared/widgets/app_shell.dart';
@@ -199,6 +200,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           settlementNo: state.pathParameters['settlementNo']!,
         ),
       ),
+      GoRoute(
+        path: '/support',
+        builder: (context, state) => const SupportPage(),
+      ),
     ],
   );
 });
@@ -275,6 +280,7 @@ bool _isKnownInternalRoute(Uri uri) {
     '/orders',
     '/apis',
     '/notifications',
+    '/support',
     '/recharge',
     '/recharge/records',
     '/withdraw',

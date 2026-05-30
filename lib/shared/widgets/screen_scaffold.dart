@@ -110,6 +110,9 @@ String? _fallbackBackPath(String path) {
   if (path == '/notifications') {
     return '/profile';
   }
+  if (path == '/support') {
+    return '/profile';
+  }
   if (path == '/profile/avatar') {
     return '/profile';
   }
