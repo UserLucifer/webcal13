@@ -46,4 +46,10 @@ app.*.map.json
 /android/app/release
 
 run_logs/
+test_reports/*.png
+test_reports/**/*.png
+test_reports/*.xml
+test_reports/**/*.xml
+test_reports/e2e_run_*.json
 test_reports/p0_regression_api_*.json
+test_reports/*_report_*.md
