@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -9,6 +10,9 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from decimal import Decimal
+
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 
 
 BASE = "http://localhost:8080"
@@ -28,6 +32,7 @@ class RegressionRun:
         self.parent_token = None
         self.child_token = None
         self.admin_token = None
+        self.team_leader_invite_code = None
         self.parent_user_id = None
         self.child_user_id = None
         self.admin_log_start = None
@@ -128,6 +133,29 @@ class RegressionRun:
             return payload.get("data")
         return payload
 
+    def encrypted_password(self, password):
+        key = self.api("GET", "/api/security/password-public-key")
+        algorithm = str(key.get("algorithm") or "").upper()
+        if "RSA-OAEP" not in algorithm or "256" not in algorithm:
+            raise RuntimeError(f"unsupported password encryption algorithm: {key.get('algorithm')}")
+        public_key = serialization.load_pem_public_key(str(key["publicKey"]).encode("utf-8"))
+        ciphertext = public_key.encrypt(
+            password.encode("utf-8"),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None,
+            ),
+        )
+        return {
+            "keyId": key["keyId"],
+            "passwordCiphertext": base64.b64encode(ciphertext).decode("ascii"),
+        }
+
+    def encrypted_password_field(self, password, field_name="passwordCiphertext"):
+        encrypted = self.encrypted_password(password)
+        return {"keyId": encrypted["keyId"], field_name: encrypted["passwordCiphertext"]}
+
     def insert_code(self, email, scene, code):
         normalized = email.strip().lower()
         code_hash = hashlib.sha256(f"{normalized}:{scene}:{code}".encode("utf-8")).hexdigest()
@@ -150,8 +178,23 @@ class RegressionRun:
         return int(rows[0][0]), rows[0][1]
 
     def login_user(self, email):
-        data = self.api("POST", "/api/auth/login", {"email": email, "password": self.password})
+        data = self.api(
+            "POST",
+            "/api/auth/login/password",
+            {"email": email, **self.encrypted_password_field(self.password)},
+        )
         return data["accessToken"]
+
+    def team_leader_invite(self):
+        rows = self.sql(
+            "SELECT invite_code FROM invite_code_registry "
+            "WHERE owner_type='TEAM_LEADER' AND status=1 "
+            "AND invite_code REGEXP '^[0-9]{8}$' "
+            "ORDER BY id LIMIT 1"
+        )
+        if not rows:
+            raise RuntimeError("no enabled 8-digit team leader invite code found")
+        return rows[0][0]
 
     def cleanup(self):
         cleanup_info = {"startedAt": datetime.now().isoformat(timespec="seconds")}
@@ -250,13 +293,18 @@ SET FOREIGN_KEY_CHECKS=1;
             self.check("commission candidate baseline is clean", unrelated == 0, {"count": unrelated})
 
             self.step("admin login")
-            admin_login = self.api("POST", "/api/admin/auth/login", {"userName": "admin", "password": "admin123"})
+            admin_login = self.api(
+                "POST",
+                "/api/admin/auth/login",
+                {"userName": "admin", **self.encrypted_password_field("admin123")},
+            )
             self.admin_token = (
                 admin_login.get("adminAccessToken") or admin_login.get("accessToken") or admin_login.get("token")
             )
             self.check("admin token received", bool(self.admin_token), {"keys": list(admin_login.keys())})
 
             self.step("signup parent/child users")
+            self.team_leader_invite_code = self.team_leader_invite()
             self.insert_code(self.parent_email, "SIGNUP", self.signup_code)
             self.insert_code(self.child_email, "SIGNUP", self.signup_code)
             self.parent_token = self.api(
@@ -266,7 +314,8 @@ SET FOREIGN_KEY_CHECKS=1;
                     "email": self.parent_email,
                     "code": self.signup_code,
                     "userName": f"P0Parent{self.run_id[-6:]}",
-                    "password": self.password,
+                    **self.encrypted_password_field(self.password),
+                    "inviteCode": self.team_leader_invite_code,
                 },
             )["accessToken"]
             self.parent_user_id, invite_code = self.get_user_row(self.parent_email)
@@ -277,7 +326,7 @@ SET FOREIGN_KEY_CHECKS=1;
                     "email": self.child_email,
                     "code": self.signup_code,
                     "userName": f"P0Child{self.run_id[-6:]}",
-                    "password": self.password,
+                    **self.encrypted_password_field(self.password),
                     "inviteCode": invite_code,
                 },
             )["accessToken"]
@@ -285,7 +334,12 @@ SET FOREIGN_KEY_CHECKS=1;
             self.parent_token = self.login_user(self.parent_email)
             self.child_token = self.login_user(self.child_email)
             self.state["created"].update(
-                {"parentUserId": self.parent_user_id, "childUserId": self.child_user_id, "inviteCode": invite_code}
+                {
+                    "parentUserId": self.parent_user_id,
+                    "childUserId": self.child_user_id,
+                    "teamLeaderInviteCode": self.team_leader_invite_code,
+                    "inviteCode": invite_code,
+                }
             )
             team_summary = self.api("GET", "/api/team/summary", token=self.parent_token)
             self.check("invite relation visible in parent team summary", int(team_summary.get("directTeamCount", 0)) >= 1, team_summary)

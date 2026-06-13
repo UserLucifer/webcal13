@@ -304,13 +304,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     }
                   },
                   decoration: const InputDecoration(
-                    labelText: '邀请码（可选）',
+                    labelText: '邀请码',
                     prefixIcon: Icon(LucideIcons.network),
                   ),
                   validator: (value) {
                     final inviteCode = value?.trim() ?? '';
                     if (inviteCode.isEmpty) {
-                      return null;
+                      return '请输入邀请码';
                     }
                     return RegExp(r'^\d{8}$').hasMatch(inviteCode)
                         ? null

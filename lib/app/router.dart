@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,11 +26,17 @@ import '../shared/widgets/app_shell.dart';
 import '../shared/widgets/operation_result_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
+  final authStateNotifier = ValueNotifier(ref.read(authControllerProvider));
+  ref.listen(authControllerProvider, (_, next) {
+    authStateNotifier.value = next;
+  });
+  ref.onDispose(authStateNotifier.dispose);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: authStateNotifier,
     redirect: (context, state) {
+      final authState = authStateNotifier.value;
       final path = state.uri.path;
       final isAuthPage = _isAuthPath(path);
       final isPublicBusinessPage = _isPublicBusinessPath(state.uri);

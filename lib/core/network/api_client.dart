@@ -230,4 +230,5 @@ const _publicAuthPaths = <String>{
   '/api/auth/reset-password/email-code/send',
   '/api/auth/reset-password/email-code/verify',
   '/api/auth/reset-password',
+  '/api/security/password-public-key',
 };
