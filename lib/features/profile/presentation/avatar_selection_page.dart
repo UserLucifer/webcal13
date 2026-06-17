@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +30,19 @@ class _AvatarSelectionPageState extends ConsumerState<AvatarSelectionPage> {
   String? _selectedAvatarKey;
   String? _hydratedAvatarKey;
   bool _saving = false;
+  bool _avatarsPrecached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_avatarsPrecached) {
+      return;
+    }
+    _avatarsPrecached = true;
+    for (final path in allAvatarAssetPaths()) {
+      unawaited(precacheImage(AssetImage(path), context));
+    }
+  }
 
   void _hydrate(UserProfile user) {
     if (_hydratedAvatarKey == user.avatarKey) {

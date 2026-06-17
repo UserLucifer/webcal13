@@ -192,9 +192,9 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         icon: LucideIcons.lineChart,
         title: '收益口径',
         items: [
-          _BusinessContextItem(label: '来源', value: '运行订单产生收益后展示，实时值来自服务端当前估算。'),
-          _BusinessContextItem(label: '结算', value: '趋势和记录以服务端结算结果为准，不在前端重算收益。'),
-          _BusinessContextItem(label: '为空', value: '没有运行订单或尚未产生结算时，收益记录会保持为空。'),
+          _BusinessContextItem(label: '来源', value: '订单运行并产生收益后展示'),
+          _BusinessContextItem(label: '结算', value: '金额与趋势以实际结算为准'),
+          _BusinessContextItem(label: '为空', value: '未产生收益时记录为空'),
         ],
       ),
       const SectionTitle(title: '收益趋势'),
@@ -280,9 +280,9 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         icon: LucideIcons.badgeDollarSign,
         title: '佣金口径',
         items: [
-          _BusinessContextItem(label: '来源', value: '团队成员产生并结算收益后，才会生成佣金记录。'),
-          _BusinessContextItem(label: '层级', value: '一级、二级佣金按服务端规则和绑定关系返回。'),
-          _BusinessContextItem(label: '为空', value: '成员未产生结算收益时，排行和佣金记录可能为空。'),
+          _BusinessContextItem(label: '来源', value: '成员收益结算后生成佣金'),
+          _BusinessContextItem(label: '层级', value: '按团队绑定关系展示层级'),
+          _BusinessContextItem(label: '为空', value: '暂无成员收益时记录为空'),
         ],
       ),
       const SectionTitle(title: '贡献排行'),
@@ -383,12 +383,12 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         items: [
           _BusinessContextItem(
             label: '绑定',
-            value: '成员通过邀请码注册后进入团队，关系以后端绑定结果为准。',
+            value: '成员通过邀请码注册后加入团队',
           ),
-          _BusinessContextItem(label: '层级', value: '直属、二级和更深层级按服务端团队关系展示。'),
+          _BusinessContextItem(label: '层级', value: '直属、二级及更多层级展示'),
           _BusinessContextItem(
             label: '为空',
-            value: '没有邀请成员或成员未完成绑定时，团队列表会保持为空。',
+            value: '暂无成员加入时团队为空',
           ),
         ],
       ),

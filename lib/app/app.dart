@@ -16,7 +16,7 @@ class WebCalApp extends ConsumerWidget {
 
     return ToastificationWrapper(
       child: MaterialApp.router(
-        title: 'WebCal Compute',
+        title: 'WebCal',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         routerConfig: router,

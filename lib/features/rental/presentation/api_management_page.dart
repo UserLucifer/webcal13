@@ -15,6 +15,7 @@ import '../../../shared/widgets/async_state_view.dart';
 import '../../../shared/widgets/info_widgets.dart';
 import '../../../shared/widgets/screen_scaffold.dart';
 import '../../../shared/widgets/webcal_card.dart';
+import '../data/rental_cache_invalidation.dart';
 import '../data/rental_repository.dart';
 
 class ApiManagementPage extends ConsumerStatefulWidget {
@@ -32,6 +33,7 @@ class _ApiManagementPageState extends ConsumerState<ApiManagementPage> {
   bool _loadingMore = false;
   bool _reachedEnd = false;
   String? _loadMoreError;
+  String? _startingOrderNo;
 
   void _clearPaging() {
     _pagingVersion += 1;
@@ -102,6 +104,82 @@ class _ApiManagementPageState extends ConsumerState<ApiManagementPage> {
     }
   }
 
+  Future<void> _startApi(DeployInfo info) async {
+    final orderNo = info.orderNo;
+    if (orderNo == null || _startingOrderNo != null) {
+      return;
+    }
+    setState(() => _startingOrderNo = orderNo);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('启动 API'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('是否可以启动以后端返回状态为准。'),
+            const SizedBox(height: AppSpacing.lg),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(LucideIcons.check),
+              label: const Text('确认'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    if (confirmed != true) {
+      setState(() => _startingOrderNo = null);
+      return;
+    }
+    try {
+      await ref.read(rentalRepositoryProvider).start(orderNo);
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(rentalOrderProvider(orderNo));
+      ref.invalidate(apiCredentialProvider(orderNo));
+      ref.invalidate(deployInfoProvider(orderNo));
+      ref.invalidate(realtimeEarningSnapshotProvider(orderNo));
+      ref.invalidate(orderProfitsProvider(orderNo));
+      invalidateRentalOrderCollections(ref);
+      invalidateApiManagementCollections(ref);
+      setState(_clearPaging);
+      if (!context.mounted) {
+        return;
+      }
+      toastification.show(
+        context: context,
+        type: ToastificationType.success,
+        title: const Text('操作成功'),
+        autoCloseDuration: const Duration(seconds: 2),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      toastification.show(
+        context: context,
+        type: ToastificationType.error,
+        title: Text(friendlyErrorMessage(error, maxLength: 80)),
+        autoCloseDuration: const Duration(seconds: 3),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _startingOrderNo = null);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final page = ref.watch(apiManagementProvider(_stage));
@@ -139,7 +217,11 @@ class _ApiManagementPageState extends ConsumerState<ApiManagementPage> {
                   for (final item in records)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _ApiManagementCard(info: item),
+                      child: _ApiManagementCard(
+                        info: item,
+                        starting: _startingOrderNo == item.orderNo,
+                        onStart: () => _startApi(item),
+                      ),
                     ),
                   if (_loadMoreError != null) ...[
                     ErrorCard(
@@ -284,9 +366,15 @@ class _StageFilter extends StatelessWidget {
 }
 
 class _ApiManagementCard extends StatelessWidget {
-  const _ApiManagementCard({required this.info});
+  const _ApiManagementCard({
+    required this.info,
+    required this.starting,
+    required this.onStart,
+  });
 
   final DeployInfo info;
+  final bool starting;
+  final VoidCallback onStart;
 
   Future<void> _copyServiceUrl(BuildContext context, String endpoint) async {
     final text = endpoint.trim();
@@ -383,6 +471,19 @@ class _ApiManagementCard extends StatelessWidget {
               onPressed: () => _copyServiceUrl(context, endpoint),
               icon: const Icon(LucideIcons.copy),
               label: const Text('复制服务地址'),
+            ),
+          ],
+          if (info.apiStage == 'READY_TO_START' && orderNo != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ElevatedButton.icon(
+              onPressed: starting ? null : onStart,
+              icon: starting
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(LucideIcons.play),
+              label: Text(starting ? '处理中...' : '启动 API'),
             ),
           ],
         ],

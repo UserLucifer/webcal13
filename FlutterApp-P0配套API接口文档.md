@@ -4,6 +4,7 @@
 适用端：WebCal 用户端 Flutter App  
 后端本地地址：`http://localhost:8080`  
 Android 模拟器访问本机后端：`http://10.0.2.2:8080`  
+Android 真机访问本机后端：使用电脑局域网 IP，例如 `http://192.168.x.x:8080`，并同步放行 Android 明文 HTTP 域名配置。
 
 > 备注：可访问 `http://localhost:8080/swagger-ui/index.html`（如果需要更多接口的情况下，可查询后台 Swagger 所有的接口）。
 
@@ -24,6 +25,8 @@ http://10.0.2.2:8080
 ```text
 http://localhost:8080
 ```
+
+Android 真机联调本机后端时，`10.0.2.2` 不可用，需要改成电脑在同一局域网内的 IP，并确保 `android/app/src/main/res/xml/network_security_config.xml` 放行该 IP 的 HTTP 明文请求。
 
 生产环境必须替换为 HTTPS API 域名，例如：
 
@@ -127,6 +130,28 @@ App 处理规则：
 
 ## 2. 认证接口
 
+### 2.0 获取密码加密公钥
+
+```http
+GET /api/security/password-public-key
+```
+
+鉴权：不需要登录。
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `keyId` | string | 当前密码加密公钥标识，提交登录、注册、重置密码时必须原样传回 |
+| `publicKey` | string | PEM 格式 RSA 公钥 |
+| `algorithm` | string | 当前为 `RSA-OAEP-256` |
+
+密码提交规则：
+
+- 登录、注册、重置密码必须先获取该公钥。
+- App 使用 RSA-OAEP + SHA-256 加密 UTF-8 密码明文，密文使用 Base64 字符串提交。
+- 后端已禁用 `password` / `newPassword` 明文字段，提交明文字段会被拒绝。
+
 ### 2.1 发送注册验证码
 
 ```http
@@ -203,8 +228,9 @@ POST /api/auth/register
 | `email` | string | 是 | 邮箱格式 | 注册邮箱 |
 | `code` | string | 是 | 4-10 位数字 | 邮箱验证码 |
 | `userName` | string | 是 | 最大 64 字符 | 用户昵称 |
-| `password` | string | 是 | 8-72 位，必须包含字母和数字，不能包含空白字符 | 登录密码 |
-| `inviteCode` | string | 否 | 8 位数字，可为空 | 邀请码，用于绑定上级关系 |
+| `passwordCiphertext` | string | 是 | Base64 RSA-OAEP-256 密文 | 登录密码密文 |
+| `keyId` | string | 是 | 来自密码加密公钥接口 | 密码公钥标识 |
+| `inviteCode` | string | 是 | 8 位数字 | 邀请码，用于绑定上级关系 |
 
 请求示例：
 
@@ -213,7 +239,8 @@ POST /api/auth/register
   "email": "user@example.com",
   "code": "123456",
   "userName": "张三",
-  "password": "abc123456",
+  "passwordCiphertext": "Base64EncodedCiphertext",
+  "keyId": "pwd-rsa-xxxxxxxxxxxxxxxx",
   "inviteCode": "12345678"
 }
 ```
@@ -270,14 +297,16 @@ POST /api/auth/login/password
 | 字段 | 类型 | 必填 | 规则 | 说明 |
 | --- | --- | --- | --- | --- |
 | `email` | string | 是 | 邮箱格式 | 登录邮箱 |
-| `password` | string | 是 | 最大 72 字符 | 登录密码 |
+| `passwordCiphertext` | string | 是 | Base64 RSA-OAEP-256 密文 | 登录密码密文 |
+| `keyId` | string | 是 | 来自密码加密公钥接口 | 密码公钥标识 |
 
 请求示例：
 
 ```json
 {
   "email": "user@example.com",
-  "password": "abc123456"
+  "passwordCiphertext": "Base64EncodedCiphertext",
+  "keyId": "pwd-rsa-xxxxxxxxxxxxxxxx"
 }
 ```
 
@@ -353,7 +382,8 @@ POST /api/auth/password/reset
 | --- | --- | --- | --- | --- |
 | `email` | string | 是 | 邮箱格式 | 邮箱 |
 | `code` | string | 是 | 4-10 位数字 | 验证码 |
-| `newPassword` | string | 是 | 8-72 位，必须包含字母和数字，不能包含空白字符 | 新密码 |
+| `newPasswordCiphertext` | string | 是 | Base64 RSA-OAEP-256 密文 | 新密码密文 |
+| `keyId` | string | 是 | 来自密码加密公钥接口 | 密码公钥标识 |
 
 响应 `data`：`null`
 

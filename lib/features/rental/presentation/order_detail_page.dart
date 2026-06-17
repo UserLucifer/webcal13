@@ -129,12 +129,22 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   Widget build(BuildContext context) {
     final orderNo = widget.orderNo;
     final order = ref.watch(rentalOrderProvider(orderNo));
+    final detail = order.valueOrNull;
+    final deployInfo = detail != null && _hasDeployFlow(detail)
+        ? ref.watch(deployInfoProvider(orderNo))
+        : null;
 
     return ScreenScaffold(
       title: '订单详情',
-      bottom: order.valueOrNull == null
+      bottom: detail == null
           ? null
-          : _actionBar(context, ref, order.valueOrNull!, orderNo),
+          : _actionBar(
+              context,
+              ref,
+              detail,
+              orderNo,
+              deployInfo?.valueOrNull,
+            ),
       onRefresh: () => _refreshDetail(ref, orderNo),
       children: [
         AsyncStateView(
@@ -307,8 +317,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     WidgetRef ref,
     RentalOrder order,
     String orderNo,
+    DeployInfo? deployInfo,
   ) {
-    final primary = _primaryAction(context, ref, order.orderStatus, orderNo);
+    final primary = _primaryAction(context, ref, order, deployInfo, orderNo);
     final secondary = _canCancel(order.orderStatus)
         ? OutlinedButton.icon(
             onPressed: _acting
@@ -367,9 +378,11 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   Widget? _primaryAction(
     BuildContext context,
     WidgetRef ref,
-    String? status,
+    RentalOrder order,
+    DeployInfo? deployInfo,
     String orderNo,
   ) {
+    final status = order.orderStatus;
     if (status == 'PENDING_PAY') {
       return ElevatedButton(
         onPressed: _acting
@@ -402,7 +415,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         child: Text(_acting ? '处理中...' : '支付部署费'),
       );
     }
-    if (status == 'PAUSED') {
+    if (_canStartApi(order, deployInfo)) {
       return ElevatedButton(
         onPressed: _acting
             ? null
@@ -448,6 +461,13 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       );
     }
     return null;
+  }
+
+  bool _canStartApi(RentalOrder order, DeployInfo? deployInfo) {
+    return order.orderStatus == 'PAUSED' ||
+        order.apiStatus == 'PAUSED' ||
+        order.apiCredential?.tokenStatus == 'PAUSED' ||
+        deployInfo?.apiStage == 'READY_TO_START';
   }
 
   bool _hasDeployFlow(RentalOrder order) {
@@ -625,7 +645,7 @@ class _DeployInfoCard extends StatelessWidget {
                 ),
               ),
               StatusPill(
-                label: StatusLabels.of(StatusLabels.api, info.tokenStatus),
+                label: StatusLabels.of(StatusLabels.apiStage, info.apiStage),
               ),
             ],
           ),
@@ -633,6 +653,14 @@ class _DeployInfoCard extends StatelessWidget {
           InfoRow(
             label: '部署费',
             value: _money(info.deployFeeSnapshot, currency),
+          ),
+          InfoRow(
+            label: 'API 阶段',
+            value: StatusLabels.of(StatusLabels.apiStage, info.apiStage),
+          ),
+          InfoRow(
+            label: 'Token 状态',
+            value: StatusLabels.of(StatusLabels.api, info.tokenStatus),
           ),
           InfoRow(
             label: '支付状态',
@@ -817,69 +845,237 @@ class _ProfitRecordsCard extends StatelessWidget {
       return const EmptyCard(title: '暂无收益记录', subtitle: '订单开始运行后会按后端结算结果展示');
     }
 
-    return Column(
-      children: [
-        for (final record in records.take(5))
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: WebCalCard(
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.coins, color: AppColors.deepForest),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          DateTimeFormatters.date(record.profitDate),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w900),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          _profitMeta(record),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _money(record.finalProfitAmount, currency),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        StatusLabels.of(StatusLabels.profit, record.status),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+    final visibleRecords = records.take(5).toList(growable: false);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: WebCalCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            for (var index = 0; index < visibleRecords.length; index++) ...[
+              _ProfitRecordTile(
+                record: visibleRecords[index],
+                currency: currency,
+              ),
+              if (index != visibleRecords.length - 1)
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  indent: AppSpacing.lg,
+                  endIndent: AppSpacing.lg,
+                  color: AppColors.outline,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfitRecordTile extends StatelessWidget {
+  const _ProfitRecordTile({required this.record, this.currency});
+
+  final ProfitRecord record;
+  final String? currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final token = record.settledTokenAmount;
+    final hasToken = _hasProfitToken(token);
+    final hasMinutes = record.effectiveMinutes != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ProfitDateBadge(value: record.profitDate),
+              const Spacer(),
+              StatusPill(
+                label: StatusLabels.of(StatusLabels.profit, record.status),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(
+                _money(record.finalProfitAmount, currency),
+                maxLines: 1,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w900,
+                  height: 1.08,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ),
-      ],
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              if (hasMinutes)
+                _ProfitMetaChip(
+                  icon: LucideIcons.clock,
+                  label: '运行 ${record.effectiveMinutes} 分钟',
+                ),
+              if (hasToken)
+                _ProfitMetaChip(icon: LucideIcons.coins, label: 'Token $token'),
+              if (!hasMinutes && !hasToken)
+                const _ProfitMetaChip(
+                  icon: LucideIcons.info,
+                  label: '收益以服务端结算为准',
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
+}
 
-  String _profitMeta(ProfitRecord record) {
-    final minutes = record.effectiveMinutes;
-    final token = record.settledTokenAmount;
-    final parts = <String>[
-      if (minutes != null) '运行 $minutes 分钟',
-      if (token != null && token != '0' && token != '0.0') 'Token $token',
-    ];
-    return parts.isEmpty ? '收益以服务端结算为准' : parts.join(' · ');
+class _ProfitDateBadge extends StatelessWidget {
+  const _ProfitDateBadge({required this.value});
+
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final day = _profitMonthDay(value);
+    final year = _profitYear(value);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 76),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                day,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+              if (year.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  year,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
+}
+
+class _ProfitMetaChip extends StatelessWidget {
+  const _ProfitMetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.deepForest.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppColors.deepForest),
+            const SizedBox(width: AppSpacing.xs),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 230),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _profitMonthDay(String? value) {
+  final parsed = DateTime.tryParse(value ?? '');
+  if (parsed != null) {
+    final local = parsed.toLocal();
+    return '${_twoDigits(local.month)}-${_twoDigits(local.day)}';
+  }
+  final date = DateTimeFormatters.date(value);
+  if (date.length >= 10 && date[4] == '-' && date[7] == '-') {
+    return date.substring(5, 10);
+  }
+  return date;
+}
+
+String _profitYear(String? value) {
+  final parsed = DateTime.tryParse(value ?? '');
+  if (parsed != null) {
+    return parsed.toLocal().year.toString();
+  }
+  final date = DateTimeFormatters.date(value);
+  if (date.length >= 10 && date[4] == '-' && date[7] == '-') {
+    return date.substring(0, 4);
+  }
+  return '';
+}
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+bool _hasProfitToken(String? value) {
+  final token = value?.trim();
+  return token != null &&
+      token.isNotEmpty &&
+      token != '0' &&
+      token != '0.0';
 }

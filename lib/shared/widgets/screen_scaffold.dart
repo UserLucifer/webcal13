@@ -110,6 +110,9 @@ String? _fallbackBackPath(String path) {
   if (path == '/notifications') {
     return '/profile';
   }
+  if (path == '/blog') {
+    return '/home';
+  }
   if (path == '/support') {
     return '/profile';
   }
@@ -148,6 +151,9 @@ String? _fallbackBackPath(String path) {
   }
   if (segments.length == 2 && segments[0] == 'notifications') {
     return '/notifications';
+  }
+  if (segments.length == 2 && segments[0] == 'blog') {
+    return '/blog';
   }
   if (segments.length == 2 && segments[0] == 'recharge') {
     return '/recharge/records';

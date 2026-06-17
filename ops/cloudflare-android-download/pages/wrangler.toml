@@ -1,0 +1,8 @@
+name = "webcal-android-download"
+compatibility_date = "2026-06-14"
+pages_build_output_dir = "."
+
+[[r2_buckets]]
+binding = "APK_BUCKET"
+bucket_name = "webcal-apk"
+

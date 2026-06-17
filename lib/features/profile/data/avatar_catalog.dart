@@ -3,13 +3,11 @@ class AvatarStyleOption {
     required this.id,
     required this.label,
     required this.prefix,
-    required this.diceBearStyle,
   });
 
   final String id;
   final String label;
   final String prefix;
-  final String diceBearStyle;
 }
 
 class AvatarOption {
@@ -29,19 +27,16 @@ const avatarStyleOptions = <AvatarStyleOption>[
     id: 'shapes',
     label: '几何',
     prefix: 'shapes_',
-    diceBearStyle: 'shapes',
   ),
   AvatarStyleOption(
     id: 'bigears',
     label: '人像',
     prefix: 'bigears_',
-    diceBearStyle: 'big-ears',
   ),
   AvatarStyleOption(
     id: 'bottts',
     label: '机器人',
     prefix: 'bottts_',
-    diceBearStyle: 'bottts',
   ),
 ];
 
@@ -100,7 +95,7 @@ bool isSupportedAvatarKey(String? avatarKey) {
   return no != null && no >= 1 && no <= 20;
 }
 
-String? avatarImageUrl(String? avatarKey, {int size = 128}) {
+String? avatarAssetPath(String? avatarKey) {
   final key = avatarKey?.trim();
   final style = avatarStyleForKey(key);
   if (key == null || key.isEmpty || style == null) {
@@ -110,8 +105,17 @@ String? avatarImageUrl(String? avatarKey, {int size = 128}) {
   if (seed.isEmpty) {
     return null;
   }
-  return Uri.https('api.dicebear.com', '/9.x/${style.diceBearStyle}/png', {
-    'seed': seed,
-    'size': size.toString(),
-  }).toString();
+  final no = int.tryParse(seed);
+  if (no == null || no < 1 || no > 20) {
+    return null;
+  }
+  return 'assets/avatars/${style.prefix}$no.png';
+}
+
+List<String> allAvatarAssetPaths() {
+  return [
+    for (final style in avatarStyleOptions)
+      for (var index = 1; index <= 20; index++)
+        'assets/avatars/${style.prefix}$index.png',
+  ];
 }

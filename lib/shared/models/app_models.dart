@@ -643,3 +643,158 @@ abstract class NotificationItem with _$NotificationItem {
   factory NotificationItem.fromJson(Map<String, dynamic> json) =>
       _$NotificationItemFromJson(json);
 }
+
+class BlogCategory {
+  const BlogCategory({
+    this.id,
+    this.categoryName,
+    this.sortNo,
+    this.status,
+    this.createdAt,
+    this.updatedAt,
+    this.locale,
+    this.requestedLocale,
+    this.localeFallback,
+  });
+
+  factory BlogCategory.fromJson(Map<String, dynamic> json) {
+    return BlogCategory(
+      id: _intFromJson(json['id']),
+      categoryName: _stringFromJson(json['categoryName']),
+      sortNo: _intFromJson(json['sortNo']),
+      status: _intFromJson(json['status']),
+      createdAt: _stringFromJson(json['createdAt']),
+      updatedAt: _stringFromJson(json['updatedAt']),
+      locale: _stringFromJson(json['locale']),
+      requestedLocale: _stringFromJson(json['requestedLocale']),
+      localeFallback: _boolFromJson(json['localeFallback']),
+    );
+  }
+
+  final int? id;
+  final String? categoryName;
+  final int? sortNo;
+  final int? status;
+  final String? createdAt;
+  final String? updatedAt;
+  final String? locale;
+  final String? requestedLocale;
+  final bool? localeFallback;
+}
+
+class BlogPost {
+  const BlogPost({
+    this.id,
+    this.categoryId,
+    this.categoryName,
+    this.title,
+    this.summary,
+    this.coverImageUrl,
+    this.contentMarkdown,
+    this.publishStatus,
+    this.publishedAt,
+    this.isTop,
+    this.sortNo,
+    this.viewCount,
+    this.createdBy,
+    this.tagIds = const <int>[],
+    this.tagNames = const <String>[],
+    this.createdAt,
+    this.updatedAt,
+    this.locale,
+    this.requestedLocale,
+    this.localeFallback,
+  });
+
+  factory BlogPost.fromJson(Map<String, dynamic> json) {
+    return BlogPost(
+      id: _intFromJson(json['id']),
+      categoryId: _intFromJson(json['categoryId']),
+      categoryName: _stringFromJson(json['categoryName']),
+      title: _stringFromJson(json['title']),
+      summary: _stringFromJson(json['summary']),
+      coverImageUrl: _stringFromJson(json['coverImageUrl']),
+      contentMarkdown: _stringFromJson(json['contentMarkdown']),
+      publishStatus: _intFromJson(json['publishStatus']),
+      publishedAt: _stringFromJson(json['publishedAt']),
+      isTop: _intFromJson(json['isTop']),
+      sortNo: _intFromJson(json['sortNo']),
+      viewCount: _intFromJson(json['viewCount']),
+      createdBy: _intFromJson(json['createdBy']),
+      tagIds: _intListFromJson(json['tagIds']),
+      tagNames: _stringListFromJson(json['tagNames']),
+      createdAt: _stringFromJson(json['createdAt']),
+      updatedAt: _stringFromJson(json['updatedAt']),
+      locale: _stringFromJson(json['locale']),
+      requestedLocale: _stringFromJson(json['requestedLocale']),
+      localeFallback: _boolFromJson(json['localeFallback']),
+    );
+  }
+
+  final int? id;
+  final int? categoryId;
+  final String? categoryName;
+  final String? title;
+  final String? summary;
+  final String? coverImageUrl;
+  final String? contentMarkdown;
+  final int? publishStatus;
+  final String? publishedAt;
+  final int? isTop;
+  final int? sortNo;
+  final int? viewCount;
+  final int? createdBy;
+  final List<int> tagIds;
+  final List<String> tagNames;
+  final String? createdAt;
+  final String? updatedAt;
+  final String? locale;
+  final String? requestedLocale;
+  final bool? localeFallback;
+}
+
+int? _intFromJson(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+bool? _boolFromJson(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0') {
+      return false;
+    }
+  }
+  return null;
+}
+
+List<int> _intListFromJson(Object? value) {
+  if (value is! List) {
+    return const <int>[];
+  }
+  return value.map(_intFromJson).whereType<int>().toList();
+}
+
+List<String> _stringListFromJson(Object? value) {
+  if (value is! List) {
+    return const <String>[];
+  }
+  return value.map(_stringFromJson).whereType<String>().toList();
+}

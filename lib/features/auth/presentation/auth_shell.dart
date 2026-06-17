@@ -79,6 +79,24 @@ class _AuthBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: AppLogo(width: 188, height: 60));
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppLogo(width: 72, height: 72),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'WebCal',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -28,8 +28,11 @@ migrate_working_dir/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
+.playwright-cli/
 .pub-cache/
 .pub/
+.wrangler/
+ops/cloudflare-android-download/releases/
 /build/
 /coverage/
 .gradle/

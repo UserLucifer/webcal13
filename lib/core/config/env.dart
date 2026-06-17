@@ -8,5 +8,5 @@ class Env {
       ? _webCalApiBaseUrl
       : _apiBaseUrl != ''
       ? _apiBaseUrl
-      : 'http://10.0.2.2:8080';
+      : 'https://api.webcal.ai';
 }

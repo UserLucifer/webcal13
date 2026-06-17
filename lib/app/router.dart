@@ -7,6 +7,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/register_page.dart';
 import '../features/auth/presentation/reset_password_page.dart';
 import '../features/auth/presentation/splash_page.dart';
+import '../features/blog/presentation/blog_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/product/presentation/product_list_page.dart';
@@ -140,6 +141,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           id: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
         ),
       ),
+      GoRoute(path: '/blog', builder: (context, state) => const BlogListPage()),
+      GoRoute(
+        path: '/blog/:id',
+        builder: (context, state) => BlogDetailPage(
+          id: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+        ),
+      ),
       GoRoute(
         path: '/orders/:orderNo',
         builder: (context, state) =>
@@ -227,6 +235,12 @@ bool _isPublicBusinessPath(Uri uri) {
   if (segments.length == 1 && segments[0] == 'market') {
     return true;
   }
+  if (segments.length == 1 && segments[0] == 'blog') {
+    return true;
+  }
+  if (segments.length == 2 && segments[0] == 'blog') {
+    return int.tryParse(segments[1]) != null;
+  }
   return segments.length == 3 &&
       segments[0] == 'market' &&
       segments[2] == 'order';
@@ -287,6 +301,7 @@ bool _isKnownInternalRoute(Uri uri) {
     '/orders',
     '/apis',
     '/notifications',
+    '/blog',
     '/support',
     '/recharge',
     '/recharge/records',
@@ -308,6 +323,7 @@ bool _isKnownInternalRoute(Uri uri) {
   if (segments.length == 2) {
     return switch (segments[0]) {
       'notifications' => int.tryParse(segments[1]) != null,
+      'blog' => int.tryParse(segments[1]) != null,
       'orders' ||
       'recharge' ||
       'withdraw' ||

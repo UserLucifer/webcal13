@@ -21,7 +21,7 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = avatarImageUrl(avatarKey, size: (size * 2).round());
+    final assetPath = avatarAssetPath(avatarKey);
     final fallback = _fallbackText(name);
 
     return DecoratedBox(
@@ -37,18 +37,12 @@ class ProfileAvatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius - 1),
         child: SizedBox.square(
           dimension: size,
-          child: imageUrl == null
+          child: assetPath == null
               ? _AvatarFallback(text: fallback)
-              : Image.network(
-                  imageUrl,
+              : Image.asset(
+                  assetPath,
                   fit: BoxFit.cover,
                   gaplessPlayback: true,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) {
-                      return child;
-                    }
-                    return _AvatarFallback(text: fallback);
-                  },
                   errorBuilder: (context, error, stackTrace) =>
                       _AvatarFallback(text: fallback),
                 ),

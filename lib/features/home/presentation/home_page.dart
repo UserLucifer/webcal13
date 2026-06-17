@@ -15,6 +15,8 @@ import '../../../shared/widgets/async_state_view.dart';
 import '../../../shared/widgets/info_widgets.dart';
 import '../../../shared/widgets/screen_scaffold.dart';
 import '../../../shared/widgets/webcal_card.dart';
+import '../../blog/data/blog_repository.dart';
+import '../../blog/presentation/blog_page.dart';
 import '../../home/data/home_repository.dart';
 import '../../notifications/data/notification_repository.dart';
 import '../../profit/data/profit_repository.dart';
@@ -53,6 +55,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.invalidate(todayEstimateProvider);
     ref.invalidate(profitTrendProvider);
     ref.invalidate(notificationsProvider((readStatus: 0, type: '')));
+    ref.invalidate(dailyNewsBlogPostProvider);
   }
 
   @override
@@ -61,6 +64,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final tokenWallet = ref.watch(tokenWalletProvider);
     final todayEstimate = ref.watch(todayEstimateProvider);
     final profitTrend = ref.watch(profitTrendProvider);
+    final dailyNewsPost = ref.watch(dailyNewsBlogPostProvider);
 
     return ScreenScaffold(
       title: '资产首页',
@@ -174,6 +178,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                   onMarket: () => context.go('/market'),
                   onOrders: () => context.push('/orders'),
                 ),
+                SectionTitle(
+                  title: '当日要闻',
+                  trailing: TextButton(
+                    onPressed: () => context.push('/blog'),
+                    child: const Text('更多'),
+                  ),
+                ),
+                _HomeDailyNewsCard(value: dailyNewsPost),
                 const SectionTitle(title: '常用入口'),
                 Row(
                   children: [
@@ -504,6 +516,77 @@ class _HomePrimaryPathCard extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 220.ms).slideY(begin: 0.04);
+  }
+}
+
+class _HomeDailyNewsCard extends StatelessWidget {
+  const _HomeDailyNewsCard({required this.value});
+
+  final AsyncValue<BlogPost?> value;
+
+  @override
+  Widget build(BuildContext context) {
+    return value.when(
+      data: (post) {
+        if (post == null) {
+          return const WebCalCard(
+            child: Row(
+              children: [
+                Icon(LucideIcons.newspaper, color: AppColors.deepForest),
+                SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    '暂无当日要闻',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return BlogPostCard(
+          post: post,
+          compact: true,
+          showCover: true,
+          showCategory: false,
+          showTags: false,
+        );
+      },
+      loading: () => const WebCalCard(
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                '正在同步要闻',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+      error: (_, _) => const WebCalCard(
+        child: Row(
+          children: [
+            Icon(LucideIcons.alertCircle, color: AppColors.danger),
+            SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                '当日要闻暂不可用',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

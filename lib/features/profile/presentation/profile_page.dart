@@ -223,6 +223,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         _ProfileMenuCard(
           items: [
             _ProfileMenuItem(
+              icon: LucideIcons.newspaper,
+              title: '博客资讯',
+              subtitle: '查看当日要闻和平台内容',
+              onTap: () => context.push('/blog'),
+            ),
+            _ProfileMenuItem(
               icon: LucideIcons.bell,
               title: '通知中心',
               subtitle: '账户、订单和系统消息',
@@ -309,13 +315,20 @@ class _ProfileIdentityCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        _AccountStatusBadge(status: user.status),
+                      ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -326,28 +339,9 @@ class _ProfileIdentityCard extends StatelessWidget {
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _JoinedAtLine(createdAt: user.createdAt),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: _AccountFact(
-                  label: '加入时间',
-                  value: DateTimeFormatters.date(user.createdAt),
-                  icon: LucideIcons.calendarDays,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _AccountFact(
-                  label: '状态',
-                  value: _statusText(user.status),
-                  icon: LucideIcons.shieldCheck,
-                  accent: user.status == 1,
                 ),
               ),
             ],
@@ -358,61 +352,81 @@ class _ProfileIdentityCard extends StatelessWidget {
   }
 }
 
-class _AccountFact extends StatelessWidget {
-  const _AccountFact({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.accent = false,
-  });
+class _AccountStatusBadge extends StatelessWidget {
+  const _AccountStatusBadge({required this.status});
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool accent;
+  final int? status;
 
   @override
   Widget build(BuildContext context) {
+    final active = status == 1;
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: accent
+        color: active
             ? AppColors.electricGreen.withValues(alpha: 0.22)
             : AppColors.softBackground,
-        borderRadius: BorderRadius.circular(AppRadii.md),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: active
+              ? AppColors.electricGreen.withValues(alpha: 0.56)
+              : AppColors.outline,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: AppColors.deepForest),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: AppColors.muted),
-                  ),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                ],
+            Icon(
+              active ? LucideIcons.shieldCheck : LucideIcons.shieldAlert,
+              size: 14,
+              color: AppColors.deepForest,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              _statusText(status),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: AppColors.deepForest,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _JoinedAtLine extends StatelessWidget {
+  const _JoinedAtLine({required this.createdAt});
+
+  final String? createdAt;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(
+          LucideIcons.calendarDays,
+          size: 14,
+          color: AppColors.deepForest,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          child: Text(
+            '加入于 ${DateTimeFormatters.date(createdAt)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
