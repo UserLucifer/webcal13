@@ -188,7 +188,7 @@ class BlogDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (id <= 0) {
       return const ScreenScaffold(
-        title: '博客详情',
+        title: '',
         children: [EmptyCard(title: '文章不存在', subtitle: '请返回博客列表重新选择')],
       );
     }
@@ -196,7 +196,7 @@ class BlogDetailPage extends ConsumerWidget {
     final detail = ref.watch(blogPostDetailProvider(id));
 
     return ScreenScaffold(
-      title: '博客详情',
+      title: '',
       onRefresh: () => ref.invalidate(blogPostDetailProvider(id)),
       children: [
         AsyncStateView(
@@ -429,49 +429,155 @@ class _BlogDetailContent extends StatelessWidget {
     final title = _textOrDefault(post.title, '未命名文章');
     final summary = post.summary?.trim();
     final content = post.contentMarkdown?.trim();
+    final tagNames = post.tagNames
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
 
     return WebCalCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          BlogCoverImage(url: post.coverImageUrl, height: 180),
-          const SizedBox(height: AppSpacing.lg),
-          if (_hasText(post.categoryName))
-            Align(
-              alignment: Alignment.centerLeft,
-              child: StatusPill(label: post.categoryName!.trim()),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              0,
             ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              height: 1.2,
-              color: AppColors.ink,
+            child: BlogCoverImage(url: post.coverImageUrl, height: 196),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_hasText(post.categoryName)) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: StatusPill(label: post.categoryName!.trim()),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.18,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _BlogMetaRow(post: post, showTags: false),
+                if (summary != null && summary.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _ArticleLead(message: summary),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                if (content == null || content.isEmpty)
+                  Text(
+                    '暂无正文',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                  )
+                else
+                  _MarkdownBody(content: content),
+                if (tagNames.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  const Divider(height: 1, color: AppColors.outline),
+                  const SizedBox(height: AppSpacing.md),
+                  _BlogTagFooter(tags: tagNames),
+                ],
+                if (post.localeFallback == true) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const InlineNotice(message: '当前文章已按可用语言展示。'),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          _BlogMetaRow(post: post),
-          if (summary != null && summary.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            InlineNotice(message: summary),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          if (content == null || content.isEmpty)
-            Text(
-              '暂无正文',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
-            )
-          else
-            _MarkdownBody(content: content),
-          if (post.localeFallback == true) ...[
-            const SizedBox(height: AppSpacing.lg),
-            const InlineNotice(message: '当前文章已按可用语言展示。'),
-          ],
         ],
       ),
+    );
+  }
+}
+
+class _ArticleLead extends StatelessWidget {
+  const _ArticleLead({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Text(
+          message,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: AppColors.deepForest,
+            height: 1.56,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BlogTagFooter extends StatelessWidget {
+  const _BlogTagFooter({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        for (final tag in tags)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.softBackground,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.tag, size: 13, color: AppColors.muted),
+                  const SizedBox(width: AppSpacing.xs),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(
+                      tag,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.deepForest,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -581,16 +687,18 @@ class _MarkdownBlockView extends StatelessWidget {
   Widget build(BuildContext context) {
     final bodyStyle = Theme.of(
       context,
-    ).textTheme.bodyMedium?.copyWith(height: 1.68, color: AppColors.deepForest);
+    ).textTheme.bodyMedium?.copyWith(height: 1.78, color: AppColors.ink);
     return switch (block.type) {
       _MarkdownBlockType.heading => Text(
         block.text,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w900,
           height: 1.28,
+          color: AppColors.ink,
         ),
       ),
       _MarkdownBlockType.list => Text(block.text, style: bodyStyle),
+      _MarkdownBlockType.image => _MarkdownImageBlock(block: block),
       _MarkdownBlockType.code => DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.softBackground,
@@ -617,6 +725,52 @@ class _MarkdownBlockView extends StatelessWidget {
   }
 }
 
+class _MarkdownImageBlock extends StatelessWidget {
+  const _MarkdownImageBlock({required this.block});
+
+  final _MarkdownBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = _resolveImageUrl(block.text);
+    final fallback = _BlogCoverFallback(height: 190);
+    final caption = block.caption?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          child: imageUrl == null
+              ? fallback
+              : Image.network(
+                  imageUrl,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => fallback,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) {
+                      return child;
+                    }
+                    return const _BlogCoverFallback(height: 190, loading: true);
+                  },
+                ),
+        ),
+        if (caption != null && caption.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            caption,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _ChipText extends StatelessWidget {
   const _ChipText(this.value);
 
@@ -631,13 +785,14 @@ class _ChipText extends StatelessWidget {
   }
 }
 
-enum _MarkdownBlockType { heading, paragraph, list, code }
+enum _MarkdownBlockType { heading, paragraph, list, image, code }
 
 class _MarkdownBlock {
-  const _MarkdownBlock(this.type, this.text);
+  const _MarkdownBlock(this.type, this.text, {this.caption});
 
   final _MarkdownBlockType type;
   final String text;
+  final String? caption;
 }
 
 List<_MarkdownBlock> _parseMarkdownBlocks(String content) {
@@ -682,6 +837,21 @@ List<_MarkdownBlock> _parseMarkdownBlocks(String content) {
       flushParagraph();
       continue;
     }
+    final image = RegExp(r'^!\[([^\]]*)\]\(([^)]+)\)$').firstMatch(trimmed);
+    if (image != null) {
+      final imageUrl = _markdownLinkTarget(image.group(2)!);
+      if (imageUrl.isNotEmpty) {
+        flushParagraph();
+        blocks.add(
+          _MarkdownBlock(
+            _MarkdownBlockType.image,
+            imageUrl,
+            caption: image.group(1),
+          ),
+        );
+        continue;
+      }
+    }
     final heading = RegExp(r'^(#{1,3})\s+(.+)$').firstMatch(trimmed);
     if (heading != null) {
       flushParagraph();
@@ -722,6 +892,22 @@ String _stripInlineMarkdown(String value) {
         RegExp(r'\[(.*?)\]\((.*?)\)'),
         (match) => match.group(1) ?? '',
       );
+}
+
+String _markdownLinkTarget(String value) {
+  var target = value.trim();
+  if (target.startsWith('<')) {
+    final closeIndex = target.indexOf('>');
+    if (closeIndex > 1) {
+      return target.substring(1, closeIndex).trim();
+    }
+  }
+
+  final title = RegExp(r'''\s+(['"]).*\1$''').firstMatch(target);
+  if (title != null) {
+    target = target.substring(0, title.start);
+  }
+  return target.trim();
 }
 
 String _textOrDefault(String? value, String fallback) {

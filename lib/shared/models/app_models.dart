@@ -583,6 +583,130 @@ abstract class TeamMember with _$TeamMember {
       _$TeamMemberFromJson(json);
 }
 
+class TeamTodayMetricsMember {
+  const TeamTodayMetricsMember({
+    this.userId,
+    this.userName,
+    this.avatarKey,
+    this.status,
+    this.levelDepth = 0,
+    this.parentId,
+    this.createdAt,
+    this.activeOrderCount = 0,
+    this.activeOrderAmount,
+    this.todayRealtimeEarningAmount,
+  });
+
+  factory TeamTodayMetricsMember.fromJson(Map<String, dynamic> json) {
+    return TeamTodayMetricsMember(
+      userId: _stringFromJson(json['userId']),
+      userName: _stringFromJson(json['userName']),
+      avatarKey: _stringFromJson(json['avatarKey']),
+      status: _intFromJson(json['status']),
+      levelDepth: _intFromJson(json['levelDepth']) ?? 0,
+      parentId: _stringFromJson(json['parentId']),
+      createdAt: _stringFromJson(json['createdAt']),
+      activeOrderCount: _intFromJson(json['activeOrderCount']) ?? 0,
+      activeOrderAmount: _stringFromJson(json['activeOrderAmount']),
+      todayRealtimeEarningAmount: _stringFromJson(
+        json['todayRealtimeEarningAmount'],
+      ),
+    );
+  }
+
+  final String? userId;
+  final String? userName;
+  final String? avatarKey;
+  final int? status;
+  final int levelDepth;
+  final String? parentId;
+  final String? createdAt;
+  final int activeOrderCount;
+  final String? activeOrderAmount;
+  final String? todayRealtimeEarningAmount;
+}
+
+class TeamTodayMetricsSnapshot {
+  const TeamTodayMetricsSnapshot({
+    this.currency,
+    this.calculatedAt,
+    this.dayStartAt,
+    this.teamConsumptionAmount,
+    this.teamTodayRealtimeEarningAmount,
+    this.self,
+    this.members = const <TeamTodayMetricsMember>[],
+  });
+
+  factory TeamTodayMetricsSnapshot.fromJson(Map<String, dynamic> json) {
+    final self = json['self'];
+    final members = json['members'];
+    return TeamTodayMetricsSnapshot(
+      currency: _stringFromJson(json['currency']),
+      calculatedAt: _stringFromJson(json['calculatedAt']),
+      dayStartAt: _stringFromJson(json['dayStartAt']),
+      teamConsumptionAmount: _stringFromJson(json['teamConsumptionAmount']),
+      teamTodayRealtimeEarningAmount: _stringFromJson(
+        json['teamTodayRealtimeEarningAmount'],
+      ),
+      self: self is Map
+          ? TeamTodayMetricsMember.fromJson(Map<String, dynamic>.from(self))
+          : null,
+      members: members is List
+          ? members
+                .whereType<Map>()
+                .map(
+                  (item) => TeamTodayMetricsMember.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList()
+          : const <TeamTodayMetricsMember>[],
+    );
+  }
+
+  final String? currency;
+  final String? calculatedAt;
+  final String? dayStartAt;
+  final String? teamConsumptionAmount;
+  final String? teamTodayRealtimeEarningAmount;
+  final TeamTodayMetricsMember? self;
+  final List<TeamTodayMetricsMember> members;
+}
+
+class TeamDailyMetricsRecord {
+  const TeamDailyMetricsRecord({
+    this.metricDate,
+    this.dayStartAt,
+    this.dayEndAt,
+    this.calculatedAt,
+    this.currency,
+    this.teamConsumptionAmount,
+    this.teamTodayRealtimeEarningAmount,
+  });
+
+  factory TeamDailyMetricsRecord.fromJson(Map<String, dynamic> json) {
+    return TeamDailyMetricsRecord(
+      metricDate: _stringFromJson(json['metricDate']),
+      dayStartAt: _stringFromJson(json['dayStartAt']),
+      dayEndAt: _stringFromJson(json['dayEndAt']),
+      calculatedAt: _stringFromJson(json['calculatedAt']),
+      currency: _stringFromJson(json['currency']),
+      teamConsumptionAmount: _stringFromJson(json['teamConsumptionAmount']),
+      teamTodayRealtimeEarningAmount: _stringFromJson(
+        json['teamTodayRealtimeEarningAmount'],
+      ),
+    );
+  }
+
+  final String? metricDate;
+  final String? dayStartAt;
+  final String? dayEndAt;
+  final String? calculatedAt;
+  final String? currency;
+  final String? teamConsumptionAmount;
+  final String? teamTodayRealtimeEarningAmount;
+}
+
 @freezed
 abstract class TeamContributionRank with _$TeamContributionRank {
   const factory TeamContributionRank({

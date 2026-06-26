@@ -176,7 +176,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       children: [
         _WalletAssetTabs(
           activeTab: _activeTab,
-          fundsLabel: _unitTitle(walletCurrency, fallback: '资金'),
+          fundsLabel: _unitTitle(walletCurrency, fallback: 'USDT'),
           tokenLabel: tokenFlowTitle,
           onChanged: _changeTab,
         ),
@@ -217,111 +217,14 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       AsyncStateView(
         value: wallet,
         onRetry: () => ref.invalidate(walletProvider),
-        builder: (data) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            WebCalCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${_unitTitle(data.currency, fallback: '资金')} 钱包',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(
-                          () => _balancesVisible = !_balancesVisible,
-                        ),
-                        tooltip: _balancesVisible ? '隐藏余额' : '显示余额',
-                        icon: Icon(
-                          _balancesVisible
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      MetricTile(
-                        label: '可用余额',
-                        value: _privateAmount(
-                          _money(data.availableBalance, data.currency),
-                        ),
-                        accent: true,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      MetricTile(
-                        label: '冻结余额',
-                        value: _privateAmount(
-                          _money(data.frozenBalance, data.currency),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => context.push('/recharge'),
-                          icon: const Icon(LucideIcons.plusCircle),
-                          label: const Text('充值'),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.push('/withdraw'),
-                          icon: const Icon(LucideIcons.arrowUpRight),
-                          label: const Text('提现'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _WalletTotalsCarousel(
-              items: [
-                _WalletTotalData(
-                  label: '累计充值',
-                  value: _privateAmount(
-                    _money(data.totalRecharge, data.currency),
-                  ),
-                  icon: LucideIcons.arrowDownLeft,
-                ),
-                _WalletTotalData(
-                  label: '累计提现',
-                  value: _privateAmount(
-                    _money(data.totalWithdraw, data.currency),
-                  ),
-                  icon: LucideIcons.arrowUpRight,
-                ),
-                _WalletTotalData(
-                  label: '累计收益',
-                  value: _privateAmount(
-                    _money(data.totalProfit, data.currency),
-                  ),
-                  icon: LucideIcons.trendingUp,
-                ),
-                _WalletTotalData(
-                  label: '累计佣金',
-                  value: _privateAmount(
-                    _money(data.totalCommission, data.currency),
-                  ),
-                  icon: LucideIcons.coins,
-                ),
-              ],
-            ),
-          ],
+        builder: (data) => _FundsWalletCard(
+          wallet: data,
+          balancesVisible: _balancesVisible,
+          onToggleVisibility: () =>
+              setState(() => _balancesVisible = !_balancesVisible),
+          onRecharge: () => context.push('/recharge'),
+          onWithdraw: () => context.push('/withdraw'),
+          privateAmount: _privateAmount,
         ),
       ),
       const SectionTitle(title: '资金流水'),
@@ -398,39 +301,8 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       AsyncStateView(
         value: token,
         onRetry: () => ref.invalidate(tokenWalletProvider),
-        builder: (data) => WebCalCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${data.assetCode ?? 'Token'} 钱包',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _WalletTotalsCarousel(
-                items: [
-                  _WalletTotalData(
-                    label: '可用 TOKEN',
-                    value: _privateAmount(_assetAmount(data.availableBalance)),
-                    icon: LucideIcons.wallet,
-                  ),
-                  _WalletTotalData(
-                    label: '累计产出 TOKEN',
-                    value: _privateAmount(_assetAmount(data.totalEarned)),
-                    icon: LucideIcons.trendingUp,
-                  ),
-                  _WalletTotalData(
-                    label: '累计消耗 TOKEN',
-                    value: _privateAmount(_assetAmount(data.totalConsumed)),
-                    icon: LucideIcons.arrowUpRight,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        builder: (data) =>
+            _TokenWalletCard(wallet: data, privateAmount: _privateAmount),
       ),
       SectionTitle(title: '$tokenFlowTitle 流水'),
       AsyncStateView(
@@ -597,39 +469,178 @@ class _WalletAssetTabButton extends StatelessWidget {
   }
 }
 
-class _WalletTotalsCarousel extends StatelessWidget {
-  const _WalletTotalsCarousel({required this.items});
+class _FundsWalletCard extends StatelessWidget {
+  const _FundsWalletCard({
+    required this.wallet,
+    required this.balancesVisible,
+    required this.onToggleVisibility,
+    required this.onRecharge,
+    required this.onWithdraw,
+    required this.privateAmount,
+  });
 
-  final List<_WalletTotalData> items;
+  final WalletInfo wallet;
+  final bool balancesVisible;
+  final VoidCallback onToggleVisibility;
+  final VoidCallback onRecharge;
+  final VoidCallback onWithdraw;
+  final String Function(String value) privateAmount;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            SizedBox(width: 196, child: _WalletTotalCard(data: items[index])),
-            if (index != items.length - 1) const SizedBox(width: AppSpacing.sm),
-          ],
-        ],
+    final unit = _unitTitle(wallet.currency, fallback: 'USDT');
+
+    return WebCalCard(
+      padding: EdgeInsets.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.deepForest,
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const _WalletDarkIconBadge(icon: LucideIcons.landmark),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$unit 钱包',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '主账户资产',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.62),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onToggleVisibility,
+                    tooltip: balancesVisible ? '隐藏余额' : '显示余额',
+                    icon: Icon(
+                      balancesVisible ? LucideIcons.eye : LucideIcons.eyeOff,
+                      color: Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _AvailableBalancePanel(
+                label: '可用余额',
+                value: privateAmount(
+                  _money(wallet.availableBalance, wallet.currency),
+                ),
+                secondaryLabel: '冻结余额',
+                secondaryValue: privateAmount(
+                  _money(wallet.frozenBalance, wallet.currency),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: _WalletDarkActionButton(
+                      icon: LucideIcons.plusCircle,
+                      label: '充值',
+                      onTap: onRecharge,
+                      primary: true,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _WalletDarkActionButton(
+                      icon: LucideIcons.arrowUpRight,
+                      label: '提现',
+                      onTap: onWithdraw,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: _WalletDarkStatTile(
+                      label: '累计充值',
+                      value: privateAmount(
+                        _money(wallet.totalRecharge, wallet.currency),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _WalletDarkStatTile(
+                      label: '累计提现',
+                      value: privateAmount(
+                        _money(wallet.totalWithdraw, wallet.currency),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: _WalletDarkStatTile(
+                      label: '累计收益',
+                      value: privateAmount(
+                        _money(wallet.totalProfit, wallet.currency),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _WalletDarkStatTile(
+                      label: '累计佣金',
+                      value: privateAmount(
+                        _money(wallet.totalCommission, wallet.currency),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _WalletTotalCard extends StatelessWidget {
-  const _WalletTotalCard({required this.data});
+class _TokenWalletCard extends StatelessWidget {
+  const _TokenWalletCard({required this.wallet, required this.privateAmount});
 
-  final _WalletTotalData data;
+  final TokenWalletInfo wallet;
+  final String Function(String value) privateAmount;
 
   @override
   Widget build(BuildContext context) {
+    final assetCode = _unitTitle(wallet.assetCode, fallback: 'Token');
+
     return WebCalCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -638,32 +649,67 @@ class _WalletTotalCard extends StatelessWidget {
                   color: AppColors.electricGreen.withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(AppRadii.md),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Icon(data.icon, size: 18, color: AppColors.deepForest),
+                child: const Padding(
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  child: Icon(
+                    LucideIcons.coins,
+                    size: 18,
+                    color: AppColors.deepForest,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$assetCode 钱包',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '产出与消耗资产',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            data.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          _TokenAvailablePanel(
+            label: '可用 $assetCode',
+            value: privateAmount(_asset(wallet.availableBalance, assetCode)),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            data.value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: AppColors.ink,
-            ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _WalletLightStatTile(
+                  label: '累计产出',
+                  value: privateAmount(_asset(wallet.totalEarned, assetCode)),
+                  icon: LucideIcons.trendingUp,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _WalletLightStatTile(
+                  label: '累计消耗',
+                  value: privateAmount(_asset(wallet.totalConsumed, assetCode)),
+                  icon: LucideIcons.arrowUpRight,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -671,8 +717,278 @@ class _WalletTotalCard extends StatelessWidget {
   }
 }
 
-class _WalletTotalData {
-  const _WalletTotalData({
+class _WalletDarkIconBadge extends StatelessWidget {
+  const _WalletDarkIconBadge({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Icon(icon, size: 18, color: AppColors.electricGreen),
+      ),
+    );
+  }
+}
+
+class _AvailableBalancePanel extends StatelessWidget {
+  const _AvailableBalancePanel({
+    required this.label,
+    required this.value,
+    this.secondaryLabel,
+    this.secondaryValue,
+  });
+
+  final String label;
+  final String value;
+  final String? secondaryLabel;
+  final String? secondaryValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.deepForest.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppColors.deepForest,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            if (secondaryLabel != null && secondaryValue != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      secondaryLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.deepForest.withValues(alpha: 0.66),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      secondaryValue!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.deepForest,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletDarkActionButton extends StatelessWidget {
+  const _WalletDarkActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = primary
+        ? AppColors.electricGreen
+        : Colors.white.withValues(alpha: 0.10);
+    final foreground = primary ? AppColors.deepForest : Colors.white;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            border: Border.all(
+              color: primary
+                  ? AppColors.electricGreen
+                  : Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 12,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletDarkStatTile extends StatelessWidget {
+  const _WalletDarkStatTile({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.58),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                height: 1.15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TokenAvailablePanel extends StatelessWidget {
+  const _TokenAvailablePanel({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: AppColors.deepForest,
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            const Icon(LucideIcons.gem, size: 30, color: AppColors.deepForest),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletLightStatTile extends StatelessWidget {
+  const _WalletLightStatTile({
     required this.label,
     required this.value,
     required this.icon,
@@ -681,6 +997,45 @@ class _WalletTotalData {
   final String label;
   final String value;
   final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: AppColors.deepForest),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+                height: 1.16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class WalletTransactionDetailPage extends ConsumerWidget {
@@ -927,52 +1282,46 @@ class _TransactionListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final txNo = tx.txNo;
+    final title = StatusLabels.of(
+      StatusLabels.businessType,
+      tx.bizType ?? tx.businessType,
+    );
+    final direction = StatusLabels.of(StatusLabels.txType, tx.txType);
+    final time = DateTimeFormatters.compact(tx.createdAt);
+
     return WebCalCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 14,
+      ),
       onTap: txNo == null ? null : () => context.push('$pathPrefix/$txNo'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(LucideIcons.receipt, color: AppColors.deepForest),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  StatusLabels.of(
-                    StatusLabels.businessType,
-                    tx.bizType ?? tx.businessType,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _WalletAmountText(value: amountFormatter(tx.amount)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              StatusPill(
-                label: StatusLabels.of(StatusLabels.txType, tx.txType),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  DateTimeFormatters.compact(tx.createdAt),
+          const _TransactionTypeIcon(),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.18,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+                StatusPill(label: direction),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          _TransactionAmountColumn(
+            amount: amountFormatter(tx.amount),
+            time: time,
           ),
         ],
       ),
@@ -980,23 +1329,67 @@ class _TransactionListCard extends StatelessWidget {
   }
 }
 
-class _WalletAmountText extends StatelessWidget {
-  const _WalletAmountText({required this.value});
-
-  final String value;
+class _TransactionTypeIcon extends StatelessWidget {
+  const _TransactionTypeIcon();
 
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      child: Text(
-        value,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.right,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w900,
-          color: AppColors.ink,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: AppColors.electricGreen.withValues(alpha: 0.44),
         ),
+      ),
+      child: const SizedBox.square(
+        dimension: 30,
+        child: Center(
+          child: Icon(
+            LucideIcons.receipt,
+            size: 18,
+            color: AppColors.deepForest,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransactionAmountColumn extends StatelessWidget {
+  const _TransactionAmountColumn({required this.amount, required this.time});
+
+  final String amount;
+  final String time;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 116, maxWidth: 132),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            amount,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            time,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          ),
+        ],
       ),
     );
   }
@@ -1018,10 +1411,6 @@ String _asset(String? value, String? assetCode) {
   }
   final unit = assetCode?.trim();
   return unit == null || unit.isEmpty ? text : '$text $unit';
-}
-
-String _assetAmount(String? value) {
-  return MoneyFormatters.number(value);
 }
 
 String _unitTitle(String? unit, {required String fallback}) {

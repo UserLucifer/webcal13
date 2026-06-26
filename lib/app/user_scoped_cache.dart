@@ -67,6 +67,7 @@ void invalidateUserScopedCaches(Ref ref) {
 
   ref.invalidate(teamSummaryProvider);
   ref.invalidate(teamMembersProvider);
+  ref.invalidate(teamTodayMetricsProvider);
   ref.invalidate(teamContributionProvider);
 
   ref.invalidate(settlementOrdersProvider);

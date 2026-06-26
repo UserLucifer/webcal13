@@ -280,7 +280,6 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
           path: '/result',
           queryParameters: {
             'title': '提现申请已提交',
-            'message': '冻结金额、手续费和实际到账以后端审核结果为准。',
             'primaryLabel': '查看提现详情',
             'primaryPath': detailPath,
             'secondaryLabel': '返回钱包',
@@ -837,15 +836,6 @@ class _WithdrawBalanceCard extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                           ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '提交提现时以服务端钱包余额为准',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.paper.withValues(alpha: 0.72),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -1184,16 +1174,6 @@ class _WithdrawSubmitBar extends StatelessWidget {
               ElevatedButton(
                 onPressed: onSubmit,
                 child: Text(submitting ? '提交中...' : '提交提现'),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '提交后冻结金额、手续费和实际到账以后端结果为准。',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: AppColors.muted),
               ),
             ],
           ),

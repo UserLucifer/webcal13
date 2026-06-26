@@ -1,13 +1,13 @@
 {
   "versionName": "1.0.0",
-  "versionCode": 4,
+  "versionCode": 5,
   "minSupportedVersionCode": 1,
   "forceUpdate": false,
-  "objectKey": "releases/1.0.0+4/webcal-1.0.0.apk",
+  "objectKey": "releases/1.0.0+5/webcal-1.0.0.apk",
   "fileName": "webcal-1.0.0.apk",
-  "fileSizeBytes": 58100307,
-  "sha256": "0A050D6ADF5A98B47EBECC0CA986B065A15FC218A3D296960D5C8C536D330C13",
-  "publishedAt": "2026-06-17T12:57:16+08:00",
+  "fileSizeBytes": 58248071,
+  "sha256": "D96C20CF5455E5BE3ED8FAF11438C23B15BAB45FA40B38F30BA9842B29F333ED",
+  "publishedAt": "2026-06-26T15:46:33+08:00",
   "releaseNotes": [
     "内测版本，仅限受邀用户使用。",
     "请通过官方私密下载页安装，避免使用转发文件。"

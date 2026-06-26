@@ -112,6 +112,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProfitTeamPage(),
           ),
           GoRoute(
+            path: '/profit/commission-rules',
+            builder: (context, state) => const CommissionRulesPage(),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
           ),
@@ -296,6 +300,7 @@ bool _isKnownInternalRoute(Uri uri) {
     '/market',
     '/wallet',
     '/profit',
+    '/profit/commission-rules',
     '/profile',
     '/profile/avatar',
     '/orders',

@@ -137,6 +137,9 @@ String? _fallbackBackPath(String path) {
   if (path == '/settlements') {
     return '/profit';
   }
+  if (path == '/profit/commission-rules') {
+    return '/profit';
+  }
 
   if (segments.length == 3 &&
       segments[0] == 'market' &&

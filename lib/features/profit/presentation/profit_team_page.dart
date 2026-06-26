@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../app/theme.dart';
@@ -22,14 +25,35 @@ class ProfitTeamPage extends ConsumerStatefulWidget {
   ConsumerState<ProfitTeamPage> createState() => _ProfitTeamPageState();
 }
 
-enum _ProfitCenterTab { profit, commission, team }
+enum _ProfitCenterTab { team, profit, commission }
+
+const _teamMetricsMemberPageSize = 10;
 
 class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
   final _profitPaging = _PagedAppendState<ProfitRecord>();
   final _commissionPaging = _PagedAppendState<CommissionRecord>();
   final _memberPaging = _PagedAppendState<TeamMember>();
   final _contributionPaging = _PagedAppendState<TeamContributionRank>();
-  _ProfitCenterTab _activeTab = _ProfitCenterTab.profit;
+  _ProfitCenterTab _activeTab = _ProfitCenterTab.team;
+  bool _showTeamMetricsView = false;
+  int _visibleTeamMetricMembers = _teamMetricsMemberPageSize;
+  Timer? _teamMetricsRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _teamMetricsRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted && _activeTab == _ProfitCenterTab.team) {
+        ref.invalidate(teamTodayMetricsProvider);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _teamMetricsRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   void _invalidateProfitProviders() {
     ref.invalidate(profitSummaryProvider);
@@ -52,9 +76,13 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         ref.invalidate(commissionRecordsProvider);
         ref.invalidate(teamContributionProvider);
       case _ProfitCenterTab.team:
-        setState(_memberPaging.reset);
+        setState(() {
+          _memberPaging.reset();
+          _visibleTeamMetricMembers = _teamMetricsMemberPageSize;
+        });
         ref.invalidate(teamSummaryProvider);
         ref.invalidate(teamMembersProvider);
+        ref.invalidate(teamTodayMetricsProvider);
     }
   }
 
@@ -147,6 +175,10 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
       onRefresh: _refresh,
       children: [
         _ProfitCenterTabs(activeTab: _activeTab, onChanged: _changeTab),
+        const SizedBox(height: AppSpacing.md),
+        _CommissionRulesEntryCard(
+          onTap: () => context.push('/profit/commission-rules'),
+        ),
         const SizedBox(height: AppSpacing.md),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
@@ -302,14 +334,11 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
           }
           return Column(
             children: [
-              _PagedSummary(
+              _ContributionLeaderboardCard(
+                items: items,
                 visibleCount: items.length,
                 totalCount: page.total,
-                label: '贡献成员',
-                icon: LucideIcons.trophy,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              _ContributionLeaderboardCard(items: items),
               _pagedFooter(
                 _contributionPaging,
                 page,
@@ -369,8 +398,57 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
   List<Widget> _teamChildren() {
     final team = ref.watch(teamSummaryProvider);
     final members = ref.watch(teamMembersProvider);
+    final todayMetrics = ref.watch(teamTodayMetricsProvider);
+
+    if (_showTeamMetricsView) {
+      return [
+        _TeamMetricsToolbar(
+          onBack: () => setState(() => _showTeamMetricsView = false),
+          onRefresh: () {
+            setState(() {
+              _visibleTeamMetricMembers = _teamMetricsMemberPageSize;
+            });
+            ref.invalidate(teamTodayMetricsProvider);
+          },
+          onOpenRecords: () => _showTeamDailyMetricsRecordsSheet(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AsyncStateView(
+          value: todayMetrics,
+          onRetry: () => ref.invalidate(teamTodayMetricsProvider),
+          builder: (data) => _TeamTodayMetricsDetailView(
+            snapshot: data,
+            visibleMemberCount: _visibleTeamMetricMembers,
+            onLoadMoreMembers: () {
+              setState(() {
+                final nextCount =
+                    _visibleTeamMetricMembers + _teamMetricsMemberPageSize;
+                _visibleTeamMetricMembers = nextCount > data.members.length
+                    ? data.members.length
+                    : nextCount;
+              });
+            },
+          ),
+        ),
+      ];
+    }
 
     return [
+      AsyncStateView(
+        value: todayMetrics,
+        onRetry: () => ref.invalidate(teamTodayMetricsProvider),
+        builder: (data) => _TeamTodayMetricsSummaryCard(
+          snapshot: data,
+          onOpenDetails: () {
+            setState(() {
+              _showTeamMetricsView = true;
+              _visibleTeamMetricMembers = _teamMetricsMemberPageSize;
+            });
+          },
+          onOpenRecords: () => _showTeamDailyMetricsRecordsSheet(context),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
       AsyncStateView(
         value: team,
         onRetry: () => ref.invalidate(teamSummaryProvider),
@@ -381,15 +459,9 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         icon: LucideIcons.users,
         title: '团队关系',
         items: [
-          _BusinessContextItem(
-            label: '绑定',
-            value: '成员通过邀请码注册后加入团队',
-          ),
+          _BusinessContextItem(label: '绑定', value: '成员通过邀请码注册后加入团队'),
           _BusinessContextItem(label: '层级', value: '直属、二级及更多层级展示'),
-          _BusinessContextItem(
-            label: '为空',
-            value: '暂无成员加入时团队为空',
-          ),
+          _BusinessContextItem(label: '为空', value: '暂无成员加入时团队为空'),
         ],
       ),
       const SectionTitle(title: '团队成员'),
@@ -433,6 +505,491 @@ class _ProfitTeamPageState extends ConsumerState<ProfitTeamPage> {
         },
       ),
     ];
+  }
+}
+
+class CommissionRulesPage extends StatelessWidget {
+  const CommissionRulesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ScreenScaffold(
+      title: '佣金规则',
+      children: [
+        _CommissionRulesHero(),
+        SizedBox(height: AppSpacing.lg),
+        SectionTitle(title: '个人推广佣金'),
+        _PersonalCommissionRuleCard(),
+        SizedBox(height: AppSpacing.lg),
+        SectionTitle(title: '团队合伙人计划'),
+        _TeamPartnerRuleCard(),
+        SizedBox(height: AppSpacing.md),
+        _CommissionRuleNotice(),
+      ],
+    );
+  }
+}
+
+class _CommissionRulesEntryCard extends StatelessWidget {
+  const _CommissionRulesEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      onTap: onTap,
+      child: Row(
+        children: [
+          const _MetricIconBadge(icon: LucideIcons.badgeDollarSign),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '佣金规则',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '查看推广佣金与团队业绩阶梯',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          const Icon(LucideIcons.chevronRight, color: AppColors.muted),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommissionRulesHero extends StatelessWidget {
+  const _CommissionRulesHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: EdgeInsets.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.deepForest,
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.electricGreen.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  child: Icon(
+                    LucideIcons.badgeDollarSign,
+                    color: AppColors.electricGreen,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                '邀请新用户，赚取佣金',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  height: 1.18,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                '推荐新用户进行注册，享受高额合伙人佣金。',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonalCommissionRuleCard extends StatelessWidget {
+  const _PersonalCommissionRuleCard();
+
+  static const _examples = [
+    _CommissionExample(
+      member: 'A',
+      rentCost: r'10000$',
+      dailyProfit: r'100$',
+      commissionRate: '0',
+      commissionAmount: r'30$',
+    ),
+    _CommissionExample(
+      member: 'B',
+      rentCost: r'10000$',
+      dailyProfit: r'100$',
+      commissionRate: '20%',
+      commissionAmount: r'20$',
+    ),
+    _CommissionExample(
+      member: 'C',
+      rentCost: r'10000$',
+      dailyProfit: r'100$',
+      commissionRate: '10%',
+      commissionAmount: r'0',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '会员通过分享自己的推广链接或推荐码，可获得下级会员每日收益的佣金提成。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.ink,
+              height: 1.58,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const _RuleHighlightRow(
+            items: [
+              _RuleHighlight(label: '一级会员', value: '20%'),
+              _RuleHighlight(label: '二级会员', value: '10%'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            '示例：会员 A 推荐会员 B，会员 B 推荐会员 C，三人各投资 10000\$ 时，文档示例如下。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.muted,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          for (var index = 0; index < _examples.length; index++) ...[
+            _CommissionExampleTile(example: _examples[index]),
+            if (index != _examples.length - 1)
+              const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamPartnerRuleCard extends StatelessWidget {
+  const _TeamPartnerRuleCard();
+
+  static const _tiers = [
+    _PerformanceTier(totalPerformance: r'50000$', reward: '团队每天总收益的15%'),
+    _PerformanceTier(totalPerformance: r'100000$', reward: '团队每天总收益的20%'),
+    _PerformanceTier(totalPerformance: r'200000$', reward: '团队每天总收益的25%'),
+    _PerformanceTier(totalPerformance: r'500000$', reward: '团队每天总收益的30%'),
+    _PerformanceTier(totalPerformance: r'500000$以上', reward: '团队每天总收益的35%'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '为奖励在平台发展建设中做出贡献的先驱者，平台限时启动团队合伙人计划。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.ink,
+              height: 1.58,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '平台根据会员团队名下会员总业绩，按层级给予团队会员每天总收益的业绩提成。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.muted,
+              height: 1.58,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          for (var index = 0; index < _tiers.length; index++) ...[
+            _PerformanceTierRow(tier: _tiers[index]),
+            if (index != _tiers.length - 1)
+              const Divider(height: AppSpacing.lg, color: AppColors.outline),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CommissionRuleNotice extends StatelessWidget {
+  const _CommissionRuleNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const InlineNotice(
+      message: '团队合伙人奖励由系统后台审核后下发至个人账户钱包，实际发放以平台审核结果为准。',
+    );
+  }
+}
+
+class _RuleHighlightRow extends StatelessWidget {
+  const _RuleHighlightRow({required this.items});
+
+  final List<_RuleHighlight> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var index = 0; index < items.length; index++) ...[
+          Expanded(child: _RuleHighlightTile(item: items[index])),
+          if (index != items.length - 1) const SizedBox(width: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _RuleHighlight {
+  const _RuleHighlight({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+class _RuleHighlightTile extends StatelessWidget {
+  const _RuleHighlightTile({required this.item});
+
+  final _RuleHighlight item;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.deepForest),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              item.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppColors.deepForest,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommissionExample {
+  const _CommissionExample({
+    required this.member,
+    required this.rentCost,
+    required this.dailyProfit,
+    required this.commissionRate,
+    required this.commissionAmount,
+  });
+
+  final String member;
+  final String rentCost;
+  final String dailyProfit;
+  final String commissionRate;
+  final String commissionAmount;
+}
+
+class _CommissionExampleTile extends StatelessWidget {
+  const _CommissionExampleTile({required this.example});
+
+  final _CommissionExample example;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        border: Border.all(color: AppColors.outline),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.deepForest,
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      '会员 ${example.member}',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.electricGreen,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  example.commissionAmount,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.deepForest,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _RuleInfoLine(label: '租赁费用', value: example.rentCost),
+            _RuleInfoLine(label: '每日收益', value: example.dailyProfit),
+            _RuleInfoLine(label: '佣金比例', value: example.commissionRate),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PerformanceTier {
+  const _PerformanceTier({
+    required this.totalPerformance,
+    required this.reward,
+  });
+
+  final String totalPerformance;
+  final String reward;
+}
+
+class _PerformanceTierRow extends StatelessWidget {
+  const _PerformanceTierRow({required this.tier});
+
+  final _PerformanceTier tier;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 4,
+          child: Text(
+            tier.totalPerformance,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppColors.deepForest,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          flex: 6,
+          child: Text(
+            tier.reward,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RuleInfoLine extends StatelessWidget {
+  const _RuleInfoLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -670,6 +1227,778 @@ class _BusinessContextRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+void _showTeamDailyMetricsRecordsSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const _TeamDailyMetricsRecordsSheet(),
+  );
+}
+
+class _TeamTodayMetricsSummaryCard extends StatelessWidget {
+  const _TeamTodayMetricsSummaryCard({
+    required this.snapshot,
+    required this.onOpenDetails,
+    required this.onOpenRecords,
+  });
+
+  final TeamTodayMetricsSnapshot snapshot;
+  final VoidCallback onOpenDetails;
+  final VoidCallback onOpenRecords;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = snapshot.currency;
+    final updatedAt = DateTimeFormatters.compact(snapshot.calculatedAt);
+    return WebCalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _MetricIconBadge(icon: LucideIcons.trendingUp),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '团队今日实时数据',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      updatedAt == '--' ? '实时快照待同步' : '更新于 $updatedAt',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CompactIconActionButton(
+                    icon: LucideIcons.list,
+                    label: '查看明细',
+                    onPressed: onOpenDetails,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  _CompactIconActionButton(
+                    icon: LucideIcons.calendarDays,
+                    label: '每日记录',
+                    onPressed: onOpenRecords,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              MetricTile(
+                label: '团队消费',
+                value: _money(
+                  snapshot.teamConsumptionAmount,
+                  currency: currency,
+                ),
+                accent: true,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              MetricTile(
+                label: '今日实时收益',
+                value: _money(
+                  snapshot.teamTodayRealtimeEarningAmount,
+                  currency: currency,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamMetricsToolbar extends StatelessWidget {
+  const _TeamMetricsToolbar({
+    required this.onBack,
+    required this.onRefresh,
+    required this.onOpenRecords,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onRefresh;
+  final VoidCallback onOpenRecords;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                tooltip: '返回团队概览',
+                onPressed: onBack,
+                icon: const Icon(LucideIcons.arrowLeft),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  '团队今日实时数据',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _CompactActionButton(
+                icon: LucideIcons.refreshCcw,
+                label: '刷新快照',
+                onPressed: onRefresh,
+              ),
+              _CompactActionButton(
+                icon: LucideIcons.calendarDays,
+                label: '每日记录',
+                onPressed: onOpenRecords,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamTodayMetricsDetailView extends StatelessWidget {
+  const _TeamTodayMetricsDetailView({
+    required this.snapshot,
+    required this.visibleMemberCount,
+    required this.onLoadMoreMembers,
+  });
+
+  final TeamTodayMetricsSnapshot snapshot;
+  final int visibleMemberCount;
+  final VoidCallback onLoadMoreMembers;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = snapshot.currency;
+    final self = snapshot.self;
+    final visibleMembers = snapshot.members.take(visibleMemberCount).toList();
+    final hasMoreMembers = visibleMembers.length < snapshot.members.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WebCalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '团队汇总',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '更新于 ${DateTimeFormatters.compact(snapshot.calculatedAt)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  MetricTile(
+                    label: '团队消费',
+                    value: _money(
+                      snapshot.teamConsumptionAmount,
+                      currency: currency,
+                    ),
+                    accent: true,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  MetricTile(
+                    label: '今日实时收益',
+                    value: _money(
+                      snapshot.teamTodayRealtimeEarningAmount,
+                      currency: currency,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SectionTitle(title: '我的实时数据'),
+        if (self == null)
+          const EmptyCard(title: '暂无我的实时数据', subtitle: '后端快照暂未返回本人指标。')
+        else
+          _TeamMetricsMemberCard(
+            member: self,
+            currency: currency,
+            titleFallback: '我',
+          ),
+        const SectionTitle(title: '下级会员实时数据'),
+        if (snapshot.members.isEmpty)
+          const EmptyCard(
+            title: '暂无下级会员实时数据',
+            subtitle: '成员有运行或暂停订单后，这里会展示消费和今日实时收益。',
+          )
+        else ...[
+          _PagedSummary(
+            visibleCount: visibleMembers.length,
+            totalCount: snapshot.members.length,
+            label: '会员指标',
+            icon: LucideIcons.users,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final member in visibleMembers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _TeamMetricsMemberCard(member: member, currency: currency),
+            ),
+          if (hasMoreMembers)
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: onLoadMoreMembers,
+              icon: const Icon(LucideIcons.chevronsDown),
+              label: const Text('加载更多会员'),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                '已显示全部会员指标',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TeamMetricsMemberCard extends StatelessWidget {
+  const _TeamMetricsMemberCard({
+    required this.member,
+    this.currency,
+    this.titleFallback = '团队成员',
+  });
+
+  final TeamTodayMetricsMember member;
+  final String? currency;
+  final String titleFallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _fallbackText(member.userName, null) ?? titleFallback;
+    return WebCalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.user, color: AppColors.deepForest),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _teamLevelText(member.levelDepth),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              if (member.status != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                StatusPill(label: _userStatusText(member.status)),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          InfoRow(label: '活跃订单', value: '${member.activeOrderCount} 单'),
+          InfoRow(
+            label: '正在租赁金额',
+            value: _money(member.activeOrderAmount, currency: currency),
+          ),
+          InfoRow(
+            label: '今日实时收益',
+            value: _money(
+              member.todayRealtimeEarningAmount,
+              currency: currency,
+            ),
+          ),
+          if (_hasText(member.createdAt))
+            InfoRow(
+              label: '加入时间',
+              value: DateTimeFormatters.compact(member.createdAt),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamDailyMetricsRecordsSheet extends ConsumerStatefulWidget {
+  const _TeamDailyMetricsRecordsSheet();
+
+  @override
+  ConsumerState<_TeamDailyMetricsRecordsSheet> createState() =>
+      _TeamDailyMetricsRecordsSheetState();
+}
+
+class _TeamDailyMetricsRecordsSheetState
+    extends ConsumerState<_TeamDailyMetricsRecordsSheet> {
+  static const _pageSize = 10;
+  final _records = <TeamDailyMetricsRecord>[];
+  int _pageNo = 1;
+  int _total = 0;
+  bool _loading = false;
+  bool _reachedEnd = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRecords(reset: true);
+    });
+  }
+
+  Future<void> _loadRecords({bool reset = false}) async {
+    if (_loading) {
+      return;
+    }
+    final nextPageNo = reset ? 1 : _pageNo + 1;
+    setState(() {
+      _loading = true;
+      _error = null;
+      if (reset) {
+        _records.clear();
+        _pageNo = 1;
+        _total = 0;
+        _reachedEnd = false;
+      }
+    });
+
+    try {
+      final page = await ref
+          .read(teamRepositoryProvider)
+          .dailyMetricsRecords(pageNo: nextPageNo, pageSize: _pageSize);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _records.addAll(page.records);
+        _pageNo = page.pageNo;
+        _total = page.total;
+        final reachedByTotal = _total > 0 && _records.length >= _total;
+        final reachedByPageSize =
+            page.pageSize > 0 && page.records.length < page.pageSize;
+        _reachedEnd =
+            page.records.isEmpty || reachedByTotal || reachedByPageSize;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = friendlyErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalText = _total > 0
+        ? '${_records.length} / $_total'
+        : '${_records.length}';
+    return FractionallySizedBox(
+      heightFactor: 0.88,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                const _MetricIconBadge(icon: LucideIcons.calendarDays),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '团队每日记录',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '昨日记录每日 00:30 后生成',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: '关闭',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(LucideIcons.x),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.outline),
+          Expanded(child: _buildRecordContent()),
+          const Divider(height: 1, color: AppColors.outline),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '已加载 $totalText 条记录',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    _error!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: _loading
+                            ? null
+                            : () => _loadRecords(reset: true),
+                        icon: const Icon(LucideIcons.refreshCcw),
+                        label: const Text('刷新'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: _loading || _reachedEnd
+                            ? null
+                            : () => _loadRecords(),
+                        icon: Icon(
+                          _loading
+                              ? LucideIcons.loader2
+                              : LucideIcons.chevronsDown,
+                        ),
+                        label: Text(_loading ? '加载中...' : '加载更多'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordContent() {
+    if (_loading && _records.isEmpty) {
+      return const _TeamDailyMetricsRecordsSkeletonList();
+    }
+    if (_error != null && _records.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: ErrorCard(
+          message: _error!,
+          onRetry: () => _loadRecords(reset: true),
+        ),
+      );
+    }
+    if (_records.isEmpty) {
+      return const _TeamDailyMetricsRecordsEmptyState();
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemBuilder: (context, index) =>
+          _TeamDailyMetricsRecordCard(record: _records[index]),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemCount: _records.length,
+    );
+  }
+}
+
+class _TeamDailyMetricsRecordsSkeletonList extends StatelessWidget {
+  const _TeamDailyMetricsRecordsSkeletonList();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemBuilder: (_, _) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.softBackground,
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+        ),
+        child: const SizedBox(height: 108),
+      ),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+      itemCount: 4,
+    );
+  }
+}
+
+class _TeamDailyMetricsRecordsEmptyState extends StatelessWidget {
+  const _TeamDailyMetricsRecordsEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: WebCalCard(
+        child: SizedBox.expand(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  LucideIcons.calendarDays,
+                  size: 30,
+                  color: AppColors.muted,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  '暂无每日记录',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamDailyMetricsRecordCard extends StatelessWidget {
+  const _TeamDailyMetricsRecordCard({required this.record});
+
+  final TeamDailyMetricsRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    return WebCalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.calendarDays, color: AppColors.deepForest),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  DateTimeFormatters.date(record.metricDate),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+              StatusPill(label: record.currency ?? 'USDT'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          InfoRow(
+            label: '团队消费',
+            value: _money(
+              record.teamConsumptionAmount,
+              currency: record.currency,
+            ),
+          ),
+          InfoRow(
+            label: '当日收益',
+            value: _money(
+              record.teamTodayRealtimeEarningAmount,
+              currency: record.currency,
+            ),
+          ),
+          InfoRow(
+            label: '计算时间',
+            value: DateTimeFormatters.compact(record.calculatedAt),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricIconBadge extends StatelessWidget {
+  const _MetricIconBadge({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.24),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Icon(icon, size: 20, color: AppColors.deepForest),
+      ),
+    );
+  }
+}
+
+class _CompactActionButton extends StatelessWidget {
+  const _CompactActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+}
+
+class _CompactIconActionButton extends StatelessWidget {
+  const _CompactIconActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: SizedBox.square(
+          dimension: 36,
+          child: Material(
+            color: AppColors.softBackground,
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(AppRadii.md),
+              child: Center(
+                child: Icon(icon, size: 17, color: AppColors.deepForest),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1104,43 +2433,270 @@ class _TeamOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WebCalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              MetricTile(
-                label: '团队总数',
-                value: '${summary.totalTeamCount}',
-                accent: true,
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.electricGreen.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  child: Icon(
+                    LucideIcons.listTree,
+                    size: 18,
+                    color: AppColors.deepForest,
+                  ),
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              MetricTile(label: '直属成员', value: '${summary.directTeamCount}'),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '团队规模',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '按邀请关系统计成员层级',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          InfoRow(label: '二级成员', value: '${summary.level2TeamCount}'),
-          InfoRow(label: '更深层级', value: '${summary.afterLevel2TeamCount}'),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.deepForest,
+              borderRadius: BorderRadius.circular(AppRadii.lg),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 18,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: _TeamOverviewPrimaryMetric(
+                      label: '团队总数',
+                      value: '${summary.totalTeamCount}',
+                      accent: true,
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 44,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    color: AppColors.electricGreen.withValues(alpha: 0.22),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: _TeamOverviewPrimaryMetric(
+                      label: '直属成员',
+                      value: '${summary.directTeamCount}',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _TeamOverviewSecondaryMetric(
+                  label: '二级成员',
+                  value: '${summary.level2TeamCount}',
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _TeamOverviewSecondaryMetric(
+                  label: '更深层级',
+                  value: '${summary.afterLevel2TeamCount}',
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _ContributionLeaderboardCard extends StatelessWidget {
-  const _ContributionLeaderboardCard({required this.items});
+class _TeamOverviewPrimaryMetric extends StatelessWidget {
+  const _TeamOverviewPrimaryMetric({
+    required this.label,
+    required this.value,
+    this.accent = false,
+  });
 
-  final List<TeamContributionRank> items;
+  final String label;
+  final String value;
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: accent ? AppColors.electricGreen : Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TeamOverviewSecondaryMetric extends StatelessWidget {
+  const _TeamOverviewSecondaryMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        border: Border.all(color: AppColors.outline),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContributionLeaderboardCard extends StatelessWidget {
+  const _ContributionLeaderboardCard({
+    required this.items,
+    required this.visibleCount,
+    required this.totalCount,
+  });
+
+  final List<TeamContributionRank> items;
+  final int visibleCount;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalText = totalCount > 0
+        ? '$visibleCount/$totalCount'
+        : '$visibleCount';
     return WebCalCard(
+      padding: EdgeInsets.zero,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              12,
+              AppSpacing.md,
+              10,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  LucideIcons.trophy,
+                  size: 18,
+                  color: AppColors.deepForest,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '贡献成员',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '已加载 $totalText',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.outline),
           for (var index = 0; index < items.length; index++) ...[
             _ContributionRow(rank: items[index]),
             if (index != items.length - 1)
-              const Divider(height: AppSpacing.lg, color: AppColors.outline),
+              const Divider(height: 1, color: AppColors.outline),
           ],
         ],
       ),
@@ -1156,85 +2712,205 @@ class _ContributionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rankLabel = rank.rankNo == null ? '--' : '${rank.rankNo}';
-    final detailParts = [
-      '今日 ${_money(rank.todayCommission, currency: rank.currency)}',
-      '本月 ${_money(rank.monthCommission, currency: rank.currency)}',
-      if (rank.commissionRecordCount != null)
-        '${rank.commissionRecordCount} 笔佣金',
+    final metaParts = [
+      _teamLevelText(rank.levelDepth),
+      if (rank.commissionRecordCount != null) '${rank.commissionRecordCount} 笔',
+      if (_hasText(rank.lastCommissionAt))
+        '最近 ${DateTimeFormatters.date(rank.lastCommissionAt)}',
     ];
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: AppColors.electricGreen.withValues(alpha: 0.38),
-          foregroundColor: AppColors.deepForest,
-          child: Text(
-            rankLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                rank.userName ?? '团队成员',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              Text(
-                _teamLevelText(rank.levelDepth),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-              ),
-              Text(
-                detailParts.join(' · '),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-              ),
-              if (_hasText(rank.lastCommissionAt))
-                Text(
-                  '最近 ${DateTimeFormatters.compact(rank.lastCommissionAt)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              _RankBadge(label: rankLabel),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rank.userName ?? '团队成员',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      metaParts.join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 118),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _money(rank.totalCommission, currency: rank.currency),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (rank.userStatus != null) ...[
+                      const SizedBox(height: 3),
+                      _MiniStatusPill(label: _userStatusText(rank.userStatus)),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Flexible(
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.only(left: 38),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ContributionMiniMetric(
+                    label: '今日',
+                    value: _money(
+                      rank.todayCommission,
+                      currency: rank.currency,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _ContributionMiniMetric(
+                    label: '本月',
+                    value: _money(
+                      rank.monthCommission,
+                      currency: rank.currency,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankBadge extends StatelessWidget {
+  const _RankBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.38),
+        shape: BoxShape.circle,
+      ),
+      child: SizedBox.square(
+        dimension: 30,
+        child: Center(
           child: Text(
-            _money(rank.totalCommission, currency: rank.currency),
-            maxLines: 2,
+            label,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.deepForest,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
-        if (rank.userStatus != null) ...[
-          const SizedBox(width: AppSpacing.sm),
-          StatusPill(label: _userStatusText(rank.userStatus)),
-        ],
-      ],
+      ),
+    );
+  }
+}
+
+class _ContributionMiniMetric extends StatelessWidget {
+  const _ContributionMiniMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softBackground,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStatusPill extends StatelessWidget {
+  const _MiniStatusPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.electricGreen.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: AppColors.deepForest,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
     );
   }
 }

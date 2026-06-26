@@ -16,6 +16,12 @@ final teamMembersProvider = FutureProvider<PageResult<TeamMember>>((ref) {
   return ref.watch(teamRepositoryProvider).members();
 });
 
+final teamTodayMetricsProvider = FutureProvider<TeamTodayMetricsSnapshot>((
+  ref,
+) {
+  return ref.watch(teamRepositoryProvider).todayMetricsSnapshot();
+});
+
 final teamContributionProvider =
     FutureProvider<PageResult<TeamContributionRank>>((ref) {
       return ref.watch(teamRepositoryProvider).contributionLeaderboard();
@@ -37,6 +43,30 @@ class TeamRepository {
       queryParameters: {'pageNo': pageNo, 'pageSize': 20},
     );
     return parsePage(data, TeamMember.fromJson);
+  }
+
+  Future<TeamTodayMetricsSnapshot> todayMetricsSnapshot() async {
+    final data = await _api.get('/api/team/today-metrics-snapshot');
+    return parseObject(data, TeamTodayMetricsSnapshot.fromJson);
+  }
+
+  Future<PageResult<TeamDailyMetricsRecord>> dailyMetricsRecords({
+    int pageNo = 1,
+    int pageSize = 10,
+    String? dateStart,
+    String? dateEnd,
+  }) async {
+    final query = <String, dynamic>{
+      'pageNum': pageNo,
+      'pageSize': pageSize,
+      if (dateStart != null && dateStart.isNotEmpty) 'dateStart': dateStart,
+      if (dateEnd != null && dateEnd.isNotEmpty) 'dateEnd': dateEnd,
+    };
+    final data = await _api.get(
+      '/api/team/daily-metrics-records',
+      queryParameters: query,
+    );
+    return parsePage(data, TeamDailyMetricsRecord.fromJson);
   }
 
   Future<PageResult<TeamContributionRank>> contributionLeaderboard({
